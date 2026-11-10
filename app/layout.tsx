@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Where Should We Eat?",
+  title: "Spin for Supper",
   description: "Can't decide? Spin the wheel and let fate pick dinner.",
 };
 

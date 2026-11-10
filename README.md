@@ -1,4 +1,4 @@
-# Where Should We Eat? 🎡
+# Spin for Supper 🎡
 
 Can't decide where to eat? Enter a zip (or tap **Near me**), pick what you're craving, your budget,
 whether the kids are coming, and hit **Make my wheel!** The wheel loads with random nearby restaurants

@@ -90,10 +90,11 @@ export default function Home() {
     <main>
       <header>
         <h1>
-          Where should
+          Spin for
           <br />
-          we <span>eat?</span>
+          <span>Supper!</span>
         </h1>
+        <p className="tag">Can’t decide where to eat? Let the wheel pick.</p>
       </header>
 
       <section className="step">

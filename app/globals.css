@@ -27,7 +27,8 @@ main { max-width: 600px; margin: 0 auto; padding: 28px 16px 64px; }
 
 header { text-align: center; margin-bottom: 28px; }
 h1 { font-size: clamp(2.8rem, 13vw, 4.6rem); margin: 0; letter-spacing: -0.04em; line-height: .95; font-weight: 900; }
-h1 span { color: var(--accent); display: inline-block; transform: rotate(-5deg); }
+h1 span { color: var(--accent); display: inline-block; transform: rotate(-4deg); }
+.tag { color: var(--muted); font-size: 1.25rem; font-weight: 700; margin: 14px 0 0; }
 
 .step { margin-top: 30px; }
 .step h2 { font-size: clamp(1.6rem, 6vw, 2.1rem); margin: 0 0 14px; font-weight: 900; letter-spacing: -0.02em; display: flex; align-items: center; gap: 12px; }
