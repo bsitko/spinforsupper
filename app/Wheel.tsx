@@ -17,6 +17,15 @@ function polar(r: number, deg: number) {
   return [r * Math.cos(rad), r * Math.sin(rad)];
 }
 
+// Second line on each slice: "★4.6 · $$ · Mexican"
+function sliceInfo(r: Restaurant) {
+  const type = (r.category || "")
+    .replace(/ restaurant$/i, "")
+    .replace(/^Cocktail bar$/i, "Cocktails")
+    .replace(/^Restaurant$/i, "");
+  return [r.rating ? `★${r.rating.toFixed(1)}` : "", r.price ? "$".repeat(r.price) : "", short(type, 12)].filter(Boolean).join(" · ");
+}
+
 function short(name: string, n: number) {
   return name.length > n ? name.slice(0, n - 1).trimEnd() + "…" : name;
 }
@@ -99,9 +108,28 @@ export default function Wheel({
             >
               <path d={`M0 0 L${x0} ${y0} A${R} ${R} 0 ${large} 1 ${x1} ${y1} Z`} fill={sliceColor(theme, i, n)[0]} stroke={t.line} strokeWidth={2} />
               <g transform={`rotate(${mid - 90})`} pointerEvents="none">
-                <text x={R - 14} y={0} textAnchor="end" dominantBaseline="middle" fontSize={Math.min(fontSize, room / (short(r.name, maxChars).length * 0.62))} fontWeight={800} fill={sliceColor(theme, i, n)[1]} style={t.textShadow ? { paintOrder: "stroke", stroke: "rgba(0,0,0,.25)", strokeWidth: 3 } : undefined}>
-                  {short(r.name, maxChars)}
-                </text>
+{(() => {
+                  const [, ink] = sliceColor(theme, i, n);
+                  const name = short(r.name, maxChars);
+                  const nameSize = Math.min(fontSize, room / (name.length * 0.62));
+                  const info = sliceInfo(r);
+                  const infoSize = Math.min(fontSize * 0.72, room / (Math.max(info.length, 1) * 0.58));
+                  const shadow = t.textShadow ? { paintOrder: "stroke" as const, stroke: "rgba(0,0,0,.25)", strokeWidth: 3 } : undefined;
+                  // Small slices (lots of places) only have room for the name.
+                  const showInfo = info && n <= 10;
+                  return (
+                    <>
+                      <text x={R - 14} y={showInfo ? -infoSize * 0.6 : 0} textAnchor="end" dominantBaseline="middle" fontSize={nameSize} fontWeight={800} fill={ink} style={shadow}>
+                        {name}
+                      </text>
+                      {showInfo && (
+                        <text x={R - 14} y={nameSize * 0.75} textAnchor="end" dominantBaseline="middle" fontSize={infoSize} fontWeight={600} fill={ink} opacity={0.85} style={shadow}>
+                          {info}
+                        </text>
+                      )}
+                    </>
+                  );
+                })()}
               </g>
             </g>
           );
