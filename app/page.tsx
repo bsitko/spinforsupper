@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Wheel from "./Wheel";
+import Logo from "./Logo";
 import { CUISINES } from "@/lib/cuisines";
 import { THEMES, THEME_IDS, type Theme, type ThemeId } from "@/lib/themes";
 import type { Restaurant, SearchResponse } from "@/lib/types";
@@ -143,6 +144,7 @@ export default function Home() {
   return (
     <main>
       <header>
+        <Logo className="logo" />
         <h1>
           Spin for
           <br />
