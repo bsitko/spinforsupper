@@ -37,12 +37,47 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
+// Pick `count` items, taking turns between groups so every craving gets slices.
+function roundRobin<T>(groups: T[][], count: number): T[] {
+  const qs = groups.map(shuffle).filter((g) => g.length);
+  const out: T[] = [];
+  while (out.length < count && qs.some((q) => q.length)) {
+    for (const q of qs) if (q.length && out.length < count) out.push(q.shift()!);
+  }
+  return out;
+}
+
+function toRestaurant(pl: any, cuisine: string): Restaurant {
+  return {
+    id: pl.id,
+    name: pl.displayName?.text ?? "Unknown",
+    address: pl.formattedAddress ?? "",
+    rating: pl.rating,
+    ratingCount: pl.userRatingCount,
+    price: pl.priceLevel ? PRICE_ENUM.indexOf(pl.priceLevel) || undefined : undefined,
+    kidFriendly:
+      pl.goodForChildren === true || pl.menuForChildren === true ? true : pl.goodForChildren === false ? false : undefined,
+    openNow: pl.currentOpeningHours?.openNow,
+    phone: pl.nationalPhoneNumber,
+    website: pl.websiteUri,
+    category: pl.primaryTypeDisplayName?.text,
+    cuisine,
+    mapsUrl: pl.googleMapsUri ?? `https://www.google.com/maps/place/?q=place_id:${pl.id}`,
+  };
+}
+
+const VALID = new Set<string>(CUISINES.map((c) => c.id));
+
 export async function GET(req: NextRequest) {
   const p = req.nextUrl.searchParams;
-  const zip = (p.get("zip") || "").trim();
+  const where = (p.get("where") || p.get("zip") || "").trim().slice(0, 80);
   const lat = parseFloat(p.get("lat") || "");
   const lng = parseFloat(p.get("lng") || "");
-  const cuisine = p.get("cuisine") || "any";
+  let cuisines = (p.get("cuisines") || p.get("cuisine") || "any")
+    .split(",")
+    .filter((c) => VALID.has(c) && c !== "any")
+    .slice(0, 6);
+  if (!cuisines.length) cuisines = ["any"];
   const prices = (p.get("prices") || "")
     .split(",")
     .map(Number)
@@ -51,47 +86,49 @@ export async function GET(req: NextRequest) {
   const openNow = p.get("open") === "1";
   const count = Math.min(Math.max(parseInt(p.get("count") || "8", 10) || 8, 2), 12);
 
-  const hasLocation = /^\d{5}$/.test(zip) || (!isNaN(lat) && !isNaN(lng));
+  const hasLocation = where.length > 1 || (!isNaN(lat) && !isNaN(lng));
   if (!hasLocation) {
-    return NextResponse.json({ error: "Enter a 5-digit zip or use your location." }, { status: 400 });
+    return NextResponse.json({ error: "Type a zip or city, or use your location." }, { status: 400 });
   }
 
   const key = process.env.GOOGLE_PLACES_API_KEY;
 
+  // Kid filter: drop places marked not kid-friendly; prefer confirmed ones, fall back to unknown.
+  const kidFilter = (list: Restaurant[]) => {
+    if (!kids) return list;
+    const yes = list.filter((r) => r.kidFriendly === true);
+    return yes.length >= Math.ceil(count / cuisines.length) ? yes : list.filter((r) => r.kidFriendly !== false);
+  };
+
   // ---- Demo mode: no key configured ----
   if (!key) {
-    let list = demoRestaurants().filter(
-      (r) =>
-        (cuisine === "any" || r.cuisine === cuisine) &&
-        (prices.length === 0 || prices.includes(r.price!)) &&
-        (!kids || r.kidFriendly) &&
-        (!openNow || r.openNow)
+    const all = demoRestaurants().filter(
+      (r) => (prices.length === 0 || prices.includes(r.price!)) && (!kids || r.kidFriendly) && (!openNow || r.openNow)
     );
+    const groups = cuisines[0] === "any" ? [all] : cuisines.map((c) => all.filter((r) => r.cuisine === c));
     const body: SearchResponse = {
       source: "demo",
-      restaurants: shuffle(list).slice(0, count),
+      restaurants: shuffle(roundRobin(groups, count)),
       message: "Demo mode: these are made-up restaurants. Add a Google Places API key for real ones.",
     };
     return NextResponse.json(body);
   }
 
-  // ---- Google Places API (New) Text Search ----
-  const label = CUISINES.find((c) => c.id === cuisine)?.label;
-  const what = cuisine === "any" || !label ? "restaurants" : `${label} restaurants`;
-  const textQuery = zip ? `${what} near ${zip}` : what;
+  // ---- Google Places API (New) Text Search: one search per craving ----
+  async function search(cuisine: string, pageToken?: string) {
+    const label = CUISINES.find((c) => c.id === cuisine)?.label;
+    const what = cuisine === "any" || !label ? "restaurants" : `${label} restaurants`;
+    // "pizza restaurants in Austin, TX" / "restaurants in 60614": Google resolves the place itself.
+    const reqBody: Record<string, unknown> = {
+      textQuery: where ? `${what} in ${where}` : what,
+      pageSize: 20,
+      includedType: "restaurant",
+    };
+    if (!where) reqBody.locationBias = { circle: { center: { latitude: lat, longitude: lng }, radius: 8000 } };
+    if (prices.length) reqBody.priceLevels = prices.map((n) => PRICE_ENUM[n]);
+    if (openNow) reqBody.openNow = true;
+    if (pageToken) reqBody.pageToken = pageToken;
 
-  const reqBody: Record<string, unknown> = {
-    textQuery,
-    pageSize: 20,
-    includedType: "restaurant",
-  };
-  if (!zip) {
-    reqBody.locationBias = { circle: { center: { latitude: lat, longitude: lng }, radius: 8000 } };
-  }
-  if (prices.length) reqBody.priceLevels = prices.map((n) => PRICE_ENUM[n]);
-  if (openNow) reqBody.openNow = true;
-
-  async function fetchPage(pageToken?: string) {
     const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
       method: "POST",
       headers: {
@@ -99,55 +136,33 @@ export async function GET(req: NextRequest) {
         "X-Goog-Api-Key": key!,
         "X-Goog-FieldMask": FIELD_MASK + ",nextPageToken",
       },
-      body: JSON.stringify(pageToken ? { ...reqBody, pageToken } : reqBody),
+      body: JSON.stringify(reqBody),
       cache: "no-store",
     });
     if (!res.ok) throw new Error(`Places API ${res.status}: ${await res.text()}`);
     return res.json() as Promise<{ places?: any[]; nextPageToken?: string }>;
   }
 
-  try {
-    // Grab up to 2 pages (40 places) so the random pick has more variety.
-    const first = await fetchPage();
+  async function placesFor(cuisine: string): Promise<Restaurant[]> {
+    const first = await search(cuisine);
     let places = first.places || [];
-    if (first.nextPageToken) {
+    // With a single craving, grab a second page so the random pick has more variety.
+    if (cuisines.length === 1 && first.nextPageToken) {
       try {
-        places = places.concat((await fetchPage(first.nextPageToken)).places || []);
+        places = places.concat((await search(cuisine, first.nextPageToken)).places || []);
       } catch {
         /* one page is fine */
       }
     }
+    return places.filter((pl) => !pl.businessStatus || pl.businessStatus === "OPERATIONAL").map((pl) => toRestaurant(pl, cuisine));
+  }
 
-    let list: Restaurant[] = places
-      .filter((pl) => !pl.businessStatus || pl.businessStatus === "OPERATIONAL")
-      .map((pl) => ({
-        id: pl.id,
-        name: pl.displayName?.text ?? "Unknown",
-        address: pl.formattedAddress ?? "",
-        rating: pl.rating,
-        ratingCount: pl.userRatingCount,
-        price: pl.priceLevel ? PRICE_ENUM.indexOf(pl.priceLevel) || undefined : undefined,
-        kidFriendly:
-          pl.goodForChildren === true || pl.menuForChildren === true
-            ? true
-            : pl.goodForChildren === false
-              ? false
-              : undefined,
-        openNow: pl.currentOpeningHours?.openNow,
-        phone: pl.nationalPhoneNumber,
-        website: pl.websiteUri,
-        category: pl.primaryTypeDisplayName?.text,
-        mapsUrl: pl.googleMapsUri ?? `https://www.google.com/maps/place/?q=place_id:${pl.id}`,
-      }));
-
-    if (kids) {
-      // Drop places Google says aren't kid-friendly; put confirmed ones first.
-      const yes = list.filter((r) => r.kidFriendly === true);
-      const maybe = list.filter((r) => r.kidFriendly === undefined);
-      list = yes.length >= count ? yes : [...shuffle(yes), ...shuffle(maybe)];
-    }
-
-    const picked = kids ? list.slice(0, count) : shuffle(list).slice(0, count);
+  try {
+    const results = await Promise.all(cuisines.map(placesFor));
+    // The same place can show up under two cravings; keep it in the first group only.
+    const seen = new Set<string>();
+    const groups = results.map((list) => kidFilter(list.filter((r) => !seen.has(r.id) && seen.add(r.id))));
+    const picked = roundRobin(groups, count);
     const body: SearchResponse = { source: "google", restaurants: shuffle(picked) };
     if (!picked.length) body.message = "No restaurants matched. Try loosening the filters.";
     return NextResponse.json(body);

@@ -11,7 +11,7 @@ export default function Home() {
   const [zip, setZip] = useState("");
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [locating, setLocating] = useState(false);
-  const [cuisine, setCuisine] = useState("any");
+  const [cuisines, setCuisines] = useState<string[]>(["any"]);
   const [prices, setPrices] = useState<number[]>([]);
   const [kids, setKids] = useState(false);
   const [openNow, setOpenNow] = useState(true);
@@ -43,7 +43,7 @@ export default function Home() {
   }, [items]);
 
   function useMyLocation() {
-    if (!navigator.geolocation) return setError("Your browser can't share location. Type a zip instead.");
+    if (!navigator.geolocation) return setError("Your browser can't share location. Type a zip or city instead.");
     setLocating(true);
     setError("");
     navigator.geolocation.getCurrentPosition(
@@ -54,24 +54,35 @@ export default function Home() {
       },
       () => {
         setLocating(false);
-        setError("Couldn't get your location. Type a zip instead.");
+        setError("Couldn't get your location. Type a zip or city instead.");
       },
       { timeout: 10000, maximumAge: 300000 }
     );
+  }
+
+  // "Surprise me" is on its own; picking any craving turns it off, and clearing them all turns it back on.
+  function toggleCuisine(id: string) {
+    setCuisines((cur) => {
+      if (id === "any") return ["any"];
+      const rest = cur.filter((c) => c !== "any");
+      const next = rest.includes(id) ? rest.filter((c) => c !== id) : [...rest, id];
+      return next.length ? next : ["any"];
+    });
   }
 
   const togglePrice = (p: number) =>
     setPrices((cur) => (cur.includes(p) ? cur.filter((x) => x !== p) : [...cur, p].sort()));
 
   async function loadWheel() {
-    const useZip = /^\d{5}$/.test(zip);
-    if (!useZip && !coords) return setError("Type a 5-digit zip or tap “Near me”.");
+    const place = zip.trim();
+    const useZip = place.length > 1;
+    if (!useZip && !coords) return setError("Type a zip or city, or tap “Near me”.");
     setLoading(true);
     setError("");
     setShown(null);
     const qs = new URLSearchParams({
-      ...(useZip ? { zip } : { lat: String(coords!.lat), lng: String(coords!.lng) }),
-      cuisine,
+      ...(useZip ? { where: place } : { lat: String(coords!.lat), lng: String(coords!.lng) }),
+      cuisines: cuisines.join(","),
       prices: prices.join(","),
       kids: kids ? "1" : "0",
       open: openNow ? "1" : "0",
@@ -99,7 +110,7 @@ export default function Home() {
     setShown(null);
   }
 
-  const usingLocation = !!coords && !zip;
+  const usingLocation = !!coords && !zip.trim();
   const r = shown?.r;
 
   return (
@@ -118,28 +129,30 @@ export default function Home() {
           <b>1</b> Where are you?
         </h2>
         <div className="where">
+          <input
+            className="big-input"
+            maxLength={80}
+            placeholder="Zip or city"
+            value={zip}
+            onChange={(e) => setZip(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && loadWheel()}
+            aria-label="Zip code or city"
+            autoComplete="postal-code"
+          />
+          <span className="or">or</span>
           <button type="button" className={`big ${usingLocation ? "on" : ""}`} onClick={useMyLocation} disabled={locating}>
             {locating ? "Finding you…" : usingLocation ? "📍 Got it!" : "📍 Near me"}
           </button>
-          <input
-            className="big-input"
-            inputMode="numeric"
-            maxLength={5}
-            placeholder="Zip"
-            value={zip}
-            onChange={(e) => setZip(e.target.value.replace(/\D/g, ""))}
-            aria-label="Zip code"
-          />
         </div>
       </section>
 
       <section className="step">
         <h2>
-          <b>2</b> Craving?
+          <b>2</b> Craving? <small>pick any</small>
         </h2>
         <div className="tiles">
           {CUISINES.map((c) => (
-            <button type="button" key={c.id} className={`tile ${cuisine === c.id ? "on" : ""}`} onClick={() => setCuisine(c.id)}>
+            <button type="button" key={c.id} className={`tile ${cuisines.includes(c.id) ? "on" : ""}`} onClick={() => toggleCuisine(c.id)} aria-pressed={cuisines.includes(c.id)}>
               <span className="emoji">{c.emoji}</span>
               {c.label}
             </button>
@@ -149,7 +162,7 @@ export default function Home() {
 
       <section className="step">
         <h2>
-          <b>3</b> Budget?
+          <b>3</b> Budget? <small>pick any</small>
         </h2>
         <div className="prices">
           {[1, 2, 3, 4].map((p) => (

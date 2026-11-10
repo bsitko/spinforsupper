@@ -1,6 +1,6 @@
 # Spin for Supper 🎡
 
-Can't decide where to eat? Enter a zip (or tap **Near me**), pick what you're craving, your budget,
+Can't decide where to eat? Enter a zip or city (or tap **Near me**), pick one or more cravings, your budget,
 whether the kids are coming, and hit **Make my wheel!** The wheel loads with random nearby restaurants
 that match. Spin it and go. Tap any slice to peek at that restaurant's Google listing.
 
