@@ -273,7 +273,7 @@ export default function Home() {
                           {[
                             p.rating ? `⭐ ${p.rating.toFixed(1)}${p.ratingCount ? ` (${p.ratingCount})` : ""}` : null,
                             dollars(p.price) || null,
-                            p.category || null,
+                            p.style ? `${p.styleEmoji ?? ""} ${p.style}`.trim() : null,
                             p.kidFriendly ? "👶" : null,
                           ]
                             .filter(Boolean)
@@ -331,8 +331,13 @@ export default function Home() {
             <button className="close" onClick={() => setShown(null)} aria-label="Close">
               ✕
             </button>
-            <p className="kicker">{shown.won ? "The wheel has spoken!" : r.category || "On the wheel"}</p>
+            <p className="kicker">{shown.won ? "The wheel has spoken!" : "On the wheel"}</p>
             <h3>{r.name}</h3>
+            {r.style && (
+              <p className="style-chip">
+                <span aria-hidden>{r.styleEmoji}</span> {r.style}
+              </p>
+            )}
             <p className="meta">
               {r.rating ? <span>⭐ {r.rating.toFixed(1)}{r.ratingCount ? ` (${r.ratingCount})` : ""}</span> : null}
               {r.price ? <span>{dollars(r.price)}</span> : null}

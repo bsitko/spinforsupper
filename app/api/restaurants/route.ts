@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { CUISINES } from "@/lib/cuisines";
 import { demoRestaurants } from "@/lib/demo";
+import { foodStyle } from "@/lib/style";
 import type { Restaurant, SearchResponse } from "@/lib/types";
 
 const PRICE_ENUM = [
@@ -24,6 +25,8 @@ const FIELD_MASK = [
   "places.nationalPhoneNumber",
   "places.websiteUri",
   "places.primaryTypeDisplayName",
+  "places.primaryType",
+  "places.types",
 ].join(",");
 // Kid-friendliness is an "Atmosphere" field, which Google bills at a higher rate, so only ask for it when needed.
 const KID_FIELDS = "places.goodForChildren,places.menuForChildren";
@@ -83,6 +86,7 @@ function toRestaurant(pl: any, cuisine: string): Restaurant {
     phone: pl.nationalPhoneNumber,
     website: pl.websiteUri,
     category: pl.primaryTypeDisplayName?.text,
+    ...(({ style, emoji }) => ({ style, styleEmoji: emoji }))(foodStyle(pl.primaryType, pl.types, cuisine, pl.primaryTypeDisplayName?.text)),
     cuisine,
     mapsUrl: pl.googleMapsUri ?? `https://www.google.com/maps/place/?q=place_id:${pl.id}`,
   };

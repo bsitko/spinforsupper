@@ -12,6 +12,8 @@ export type Restaurant = {
   phone?: string;
   website?: string;
   category?: string;
+  style?: string; // short style of food, e.g. "Mexican"
+  styleEmoji?: string;
 };
 
 export type SearchResponse = {

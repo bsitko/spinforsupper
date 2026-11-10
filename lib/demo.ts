@@ -1,4 +1,5 @@
 import type { Restaurant } from "./types";
+import { foodStyle } from "./style";
 
 // Fake restaurants used when no Google API key is configured.
 const raw: [string, string, number, boolean, number][] = [
@@ -51,6 +52,7 @@ export function demoRestaurants(): Restaurant[] {
     openNow: i % 5 !== 0,
     address: `${100 + i * 7} Main St (demo)`,
     phone: `(555) 01${String(i).padStart(2, "0")}-0000`,
+    ...(({ style, emoji }) => ({ style, styleEmoji: emoji }))(foodStyle(undefined, [], cuisine)),
     category: cuisine === "cocktails" ? "Cocktail bar" : cuisine[0].toUpperCase() + cuisine.slice(1) + " restaurant",
     mapsUrl: `https://www.google.com/maps/search/${encodeURIComponent(name)}`,
   }));

@@ -19,10 +19,7 @@ function polar(r: number, deg: number) {
 
 // Second line on each slice: "★4.6 · $$ · Mexican"
 function sliceInfo(r: Restaurant) {
-  const type = (r.category || "")
-    .replace(/ restaurant$/i, "")
-    .replace(/^Cocktail bar$/i, "Cocktails")
-    .replace(/^Restaurant$/i, "");
+  const type = r.style || "";
   return [r.rating ? `★${r.rating.toFixed(1)}` : "", r.price ? "$".repeat(r.price) : "", short(type, 12)].filter(Boolean).join(" · ");
 }
 

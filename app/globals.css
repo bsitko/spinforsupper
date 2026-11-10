@@ -133,3 +133,4 @@ button:disabled { opacity: .6; cursor: default; }
 .views { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px; }
 .list-hint { margin: 10px 0 14px; }
 .pick-addr { color: var(--muted); font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.style-chip { display: inline-flex; align-items: center; gap: 8px; margin: -4px 0 12px; padding: 6px 16px; border-radius: 999px; background: var(--accent); color: #fff; font-weight: 900; font-size: 1.2rem; }
