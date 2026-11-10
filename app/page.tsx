@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import Wheel from "./Wheel";
 import Logo from "./Logo";
+import { track } from "@/lib/analytics";
 import { CUISINES } from "@/lib/cuisines";
 import { THEMES, THEME_IDS, type Theme, type ThemeId } from "@/lib/themes";
 import type { Restaurant, SearchResponse } from "@/lib/types";
@@ -31,6 +32,7 @@ export default function Home() {
   const [pool, setPool] = useState<Restaurant[]>([]); // everything that matched, for the list
   const [view, setView] = useState<"wheel" | "list">("wheel");
   const [loadedAt, setLoadedAt] = useState(0);
+  const lastQuery = useRef(""); // the last search sent to Google, to avoid paying for the same one twice
   const [shown, setShown] = useState<{ r: Restaurant; won: boolean } | null>(null);
   const stageRef = useRef<HTMLElement>(null);
   const [theme, setThemeState] = useState<ThemeId>("diner");
@@ -52,6 +54,7 @@ export default function Home() {
 
   function setTheme(t: ThemeId) {
     setThemeState(t);
+    track("theme", { theme: t });
     try {
       localStorage.setItem("wheel-theme", t);
     } catch {}
@@ -108,6 +111,14 @@ export default function Home() {
       open: openNow ? "1" : "0",
       count: "8",
     });
+    // Same filters as last time? Reshuffle what we already have instead of paying for another search.
+    if (qs.toString() === lastQuery.current && pool.length >= 2) {
+      reshuffle();
+      setLoading(false);
+      setLoadedAt(Date.now());
+      return;
+    }
+    track("search", { location: useZip ? "typed" : "near_me", cravings: cuisines.join(","), prices: prices.join(",") || "any", kids, open_now: openNow });
     try {
       const res = await fetch(`/api/restaurants?${qs}`);
       const data = (await res.json()) as SearchResponse & { error?: string };
@@ -121,6 +132,7 @@ export default function Home() {
         setItems(data.restaurants);
         setPool(data.pool?.length ? data.pool : data.restaurants);
         setLoadedAt(Date.now());
+        lastQuery.current = qs.toString();
       }
     } catch (err) {
       setError((err as Error).message);
@@ -129,8 +141,21 @@ export default function Home() {
     }
   }
 
+  // New wheel from the places already found: free, no Google call.
+  function reshuffle() {
+    const a = [...pool];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    setItems(a.slice(0, 8));
+    setShown(null);
+    track("new_wheel");
+  }
+
   function veto() {
     if (!shown) return;
+    track("veto", { place: shown.r.name });
     setItems((cur) => cur.filter((r) => r.id !== shown.r.id));
     setShown(null);
   }
@@ -219,17 +244,17 @@ export default function Home() {
         <section className="stage" ref={stageRef}>
           {notice && <p className="notice">{notice}</p>}
           <div className="views" role="tablist" aria-label="Show results as">
-            <button type="button" role="tab" aria-selected={view === "wheel"} className={`big ${view === "wheel" ? "on" : ""}`} onClick={() => setView("wheel")}>
+            <button type="button" role="tab" aria-selected={view === "wheel"} className={`big ${view === "wheel" ? "on" : ""}`} onClick={() => (setView("wheel"), track("view", { as: "wheel" }))}>
               🎡 Wheel
             </button>
-            <button type="button" role="tab" aria-selected={view === "list"} className={`big ${view === "list" ? "on" : ""}`} onClick={() => setView("list")}>
+            <button type="button" role="tab" aria-selected={view === "list"} className={`big ${view === "list" ? "on" : ""}`} onClick={() => (setView("list"), track("view", { as: "list" }))}>
               📋 List
             </button>
           </div>
 
           {view === "wheel" ? (
             <>
-              <Wheel items={items} theme={theme} onResult={(r) => setShown({ r, won: true })} onPick={(r) => setShown({ r, won: false })} />
+              <Wheel items={items} theme={theme} onResult={(r) => (setShown({ r, won: true }), track("spin_result", { place: r.name }))} onPick={(r) => setShown({ r, won: false })} />
               <p className="hint">Hit SPIN or flick the wheel · tap a slice to peek</p>
             </>
           ) : (
@@ -264,9 +289,11 @@ export default function Home() {
             </>
           )}
 
-          <button type="button" className="big regen" onClick={loadWheel} disabled={loading}>
-            {loading ? "Finding food…" : view === "wheel" ? "🔄 New wheel" : "🔄 New list"}
-          </button>
+          {view === "wheel" && pool.length > 2 && (
+            <button type="button" className="big regen" onClick={reshuffle}>
+              🔄 New wheel
+            </button>
+          )}
         </section>
       )}
 
@@ -319,11 +346,11 @@ export default function Home() {
               </p>
             )}
             <div className="actions">
-              <a className="go" href={r.mapsUrl} target="_blank" rel="noreferrer">
+              <a className="go" href={r.mapsUrl} target="_blank" rel="noreferrer" onClick={() => track(shown.won ? "lets_go" : "open_listing", { place: r.name })}>
                 {shown.won ? "🗺️ Let’s go!" : "🗺️ See on Google"}
               </a>
               {r.website && (
-                <a className="big" href={r.website} target="_blank" rel="noreferrer">
+                <a className="big" href={r.website} target="_blank" rel="noreferrer" onClick={() => track("open_website", { place: r.name })}>
                   🌐 Website / menu
                 </a>
               )}

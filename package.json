@@ -8,6 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@next/third-parties": "15.5.29",
     "next": "15.5.29",
     "react": "19.1.10",
     "react-dom": "19.1.10"

@@ -39,3 +39,24 @@ npm run dev                  # http://localhost:3000
 - **Kids coming** drops places Google marks as not good for children and favors ones marked good.
 - 8 are picked at random for the wheel, so every **New wheel** is different.
 - **Nope, spin again** removes the winner from the wheel.
+
+## Analytics
+
+Set these in Vercel (Settings → Environment Variables), then redeploy:
+
+- `NEXT_PUBLIC_GA_ID`: your Google Analytics 4 measurement ID (`G-XXXXXXXXXX`). Page views are tracked automatically,
+  plus these events: `search`, `new_wheel`, `spin_result`, `veto`, `view` (wheel/list), `open_listing`, `lets_go`,
+  `open_website`, `theme`.
+- `NEXT_PUBLIC_GTM_ID` (optional): a Google Tag Manager container (`GTM-XXXXXXX`) for adding other tags
+  (Meta Pixel, ad conversions, etc.) without code changes.
+
+## Keeping Google Places costs down
+
+Each search costs one billed Text Search call per craving (max 4). The app already:
+
+- asks for one page of results only, and only requests the pricier kid-friendly fields when "Kids coming" is on;
+- reshuffles the places it already has for **New wheel** and for repeat searches with the same filters (no new call);
+- limits each visitor to 20 Google searches per 10 minutes.
+
+On the Google Cloud side, also set a hard cap: **APIs & Services → Places API (New) → Quotas** → lower
+"Text Search requests per day" (e.g. 300), and add a budget alert under **Billing → Budgets & alerts**.

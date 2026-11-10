@@ -19,14 +19,27 @@ const FIELD_MASK = [
   "places.userRatingCount",
   "places.priceLevel",
   "places.googleMapsUri",
-  "places.goodForChildren",
-  "places.menuForChildren",
   "places.currentOpeningHours.openNow",
   "places.businessStatus",
   "places.nationalPhoneNumber",
   "places.websiteUri",
   "places.primaryTypeDisplayName",
 ].join(",");
+// Kid-friendliness is an "Atmosphere" field, which Google bills at a higher rate, so only ask for it when needed.
+const KID_FIELDS = "places.goodForChildren,places.menuForChildren";
+
+// Basic abuse guard: each IP gets a limited number of Google searches per window (per server instance).
+const RATE_WINDOW_MS = 10 * 60 * 1000;
+const RATE_MAX = 20;
+const hits = new Map<string, number[]>();
+function rateLimited(ip: string) {
+  const now = Date.now();
+  const recent = (hits.get(ip) || []).filter((t) => now - t < RATE_WINDOW_MS);
+  recent.push(now);
+  hits.set(ip, recent);
+  if (hits.size > 5000) hits.clear();
+  return recent.length > RATE_MAX;
+}
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -85,7 +98,7 @@ export async function GET(req: NextRequest) {
   let cuisines = (p.get("cuisines") || p.get("cuisine") || "any")
     .split(",")
     .filter((c) => VALID.has(c) && c !== "any")
-    .slice(0, 6);
+    .slice(0, 4); // each craving is one billed Google call
   if (!cuisines.length) cuisines = ["any"];
   const prices = (p.get("prices") || "")
     .split(",")
@@ -126,7 +139,7 @@ export async function GET(req: NextRequest) {
   }
 
   // ---- Google Places API (New) Text Search: one search per craving ----
-  async function search(cuisine: string, pageToken?: string) {
+  async function search(cuisine: string) {
     const c = CUISINES.find((c) => c.id === cuisine);
     const what = !c || cuisine === "any" ? "restaurants" : "query" in c ? c.query : `${c.label} restaurants`;
     // "pizza restaurants in Austin, TX" / "restaurants in 60614": Google resolves the place itself.
@@ -138,34 +151,30 @@ export async function GET(req: NextRequest) {
     if (!where) reqBody.locationBias = { circle: { center: { latitude: lat, longitude: lng }, radius: 8000 } };
     if (prices.length) reqBody.priceLevels = prices.map((n) => PRICE_ENUM[n]);
     if (openNow) reqBody.openNow = true;
-    if (pageToken) reqBody.pageToken = pageToken;
 
     const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": key!,
-        "X-Goog-FieldMask": FIELD_MASK + ",nextPageToken",
+        "X-Goog-FieldMask": kids ? `${FIELD_MASK},${KID_FIELDS}` : FIELD_MASK,
       },
       body: JSON.stringify(reqBody),
       cache: "no-store",
     });
     if (!res.ok) throw new Error(`Places API ${res.status}: ${await res.text()}`);
-    return res.json() as Promise<{ places?: any[]; nextPageToken?: string }>;
+    return res.json() as Promise<{ places?: any[] }>;
   }
 
+  // One page (up to 20 places) per craving. Each call is billed, so no extra pages.
   async function placesFor(cuisine: string): Promise<Restaurant[]> {
-    const first = await search(cuisine);
-    let places = first.places || [];
-    // With a single craving, grab a second page so the random pick has more variety.
-    if (cuisines.length === 1 && first.nextPageToken) {
-      try {
-        places = places.concat((await search(cuisine, first.nextPageToken)).places || []);
-      } catch {
-        /* one page is fine */
-      }
-    }
+    const { places = [] } = await search(cuisine);
     return places.filter((pl) => !pl.businessStatus || pl.businessStatus === "OPERATIONAL").map((pl) => toRestaurant(pl, cuisine));
+  }
+
+  const ip = (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "unknown";
+  if (rateLimited(ip)) {
+    return NextResponse.json({ error: "Whoa, that's a lot of spinning! Try again in a few minutes." }, { status: 429 });
   }
 
   try {
