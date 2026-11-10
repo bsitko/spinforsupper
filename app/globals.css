@@ -126,3 +126,5 @@ button:disabled { opacity: .6; cursor: default; }
 .pick-meta { color: var(--muted); font-weight: 600; font-size: 1rem; }
 .chev { flex: none; font-size: 2rem; color: var(--muted); line-height: 1; }
 .themes { margin-top: 0; }
+.theme-picker { margin-top: 48px; }
+.theme .swatch { border-color: var(--ink); }

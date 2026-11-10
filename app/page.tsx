@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import Wheel from "./Wheel";
 import { CUISINES } from "@/lib/cuisines";
-import { THEMES, THEME_IDS, type ThemeId } from "@/lib/themes";
+import { THEMES, THEME_IDS, type Theme, type ThemeId } from "@/lib/themes";
 import type { Restaurant, SearchResponse } from "@/lib/types";
 
 const dollars = (n?: number) => (n ? "$".repeat(n) : "");
@@ -30,6 +30,14 @@ export default function Home() {
   const [shown, setShown] = useState<{ r: Restaurant; won: boolean } | null>(null);
   const stageRef = useRef<HTMLElement>(null);
   const [theme, setThemeState] = useState<ThemeId>("diner");
+
+  // Recolor the page's buttons and highlights to match the wheel theme.
+  useEffect(() => {
+    const t: Theme = THEMES[theme];
+    const root = document.documentElement.style;
+    root.setProperty("--accent", t.accent);
+    root.setProperty("--accent-dark", t.accentDark);
+  }, [theme]);
 
   useEffect(() => {
     try {
@@ -230,24 +238,27 @@ export default function Home() {
             ))}
           </ol>
 
-          <h2 className="list-title">Wheel colors</h2>
-          <div className="themes" role="radiogroup" aria-label="Wheel colors">
-            {THEME_IDS.map((id) => (
-              <button
-                key={id}
-                type="button"
-                role="radio"
-                aria-checked={theme === id}
-                className={`theme ${theme === id ? "on" : ""}`}
-                onClick={() => setTheme(id)}
-              >
-                <span className="swatch" style={{ background: `conic-gradient(${THEMES[id].slices.slice(0, 4).map((s, i, a) => `${s[0]} ${(i * 100) / a.length}% ${((i + 1) * 100) / a.length}%`).join(", ")})` }} />
-                {THEMES[id].label}
-              </button>
-            ))}
-          </div>
         </section>
       )}
+
+      <section className="theme-picker">
+        <h2 className="list-title">Pick a theme</h2>
+        <div className="themes" role="radiogroup" aria-label="Wheel colors">
+          {THEME_IDS.map((id) => (
+            <button
+              key={id}
+              type="button"
+              role="radio"
+              aria-checked={theme === id}
+              className={`theme ${theme === id ? "on" : ""}`}
+              onClick={() => setTheme(id)}
+            >
+              <span className="swatch" style={{ background: `conic-gradient(${THEMES[id].slices.slice(0, 4).map((s, i, a) => `${s[0]} ${(i * 100) / a.length}% ${((i + 1) * 100) / a.length}%`).join(", ")})` }} />
+              {THEMES[id].label}
+            </button>
+          ))}
+        </div>
+      </section>
 
       {r && (
         <div className="modal" onClick={() => setShown(null)}>
