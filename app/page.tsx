@@ -7,6 +7,13 @@ import type { Restaurant, SearchResponse } from "@/lib/types";
 
 const dollars = (n?: number) => (n ? "$".repeat(n) : "");
 
+function score(r: Restaurant) {
+  if (!r.rating) return 0;
+  const v = r.ratingCount ?? 0;
+  const m = 50; // reviews needed before a rating is fully trusted
+  return (v / (v + m)) * r.rating + (m / (v + m)) * 4;
+}
+
 export default function Home() {
   const [zip, setZip] = useState("");
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
@@ -110,6 +117,9 @@ export default function Home() {
     setShown(null);
   }
 
+  // Rank by rating, trusting ratings with more reviews (a 5.0 from 3 reviews shouldn't beat a 4.7 from 900).
+  const ranked = [...items].sort((a, b) => score(b) - score(a));
+
   const usingLocation = !!coords && !zip.trim();
   const r = shown?.r;
 
@@ -191,6 +201,36 @@ export default function Home() {
           {notice && <p className="notice">{notice}</p>}
           <Wheel items={items} theme={theme} onResult={(r) => setShown({ r, won: true })} onPick={(r) => setShown({ r, won: false })} />
           <p className="hint">Hit SPIN · tap any slice to peek at it</p>
+          <button type="button" className="big regen" onClick={loadWheel} disabled={loading}>
+            {loading ? "Finding food…" : "🔄 Regenerate"}
+          </button>
+
+          <h2 className="list-title">Our top picks</h2>
+          <ol className="picks">
+            {ranked.map((p, i) => (
+              <li key={p.id}>
+                <button type="button" className="pick" onClick={() => setShown({ r: p, won: false })}>
+                  <span className="rank">{i < 3 ? ["🥇", "🥈", "🥉"][i] : i + 1}</span>
+                  <span className="pick-body">
+                    <span className="pick-name">{p.name}</span>
+                    <span className="pick-meta">
+                      {[
+                        p.rating ? `⭐ ${p.rating.toFixed(1)}${p.ratingCount ? ` (${p.ratingCount})` : ""}` : null,
+                        dollars(p.price) || null,
+                        p.category || null,
+                        p.kidFriendly ? "👶" : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </span>
+                  </span>
+                  <span className="chev" aria-hidden>›</span>
+                </button>
+              </li>
+            ))}
+          </ol>
+
+          <h2 className="list-title">Wheel colors</h2>
           <div className="themes" role="radiogroup" aria-label="Wheel colors">
             {THEME_IDS.map((id) => (
               <button
