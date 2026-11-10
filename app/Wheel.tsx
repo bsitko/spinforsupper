@@ -43,7 +43,13 @@ export default function Wheel({
   theme: ThemeId;
   disabled?: boolean;
 }) {
-  const [rotation, setRotation] = useState(0);
+  const [rotation, setRotationState] = useState(0);
+  // Kept in a ref too, so a spin that starts right after a drag sees the exact latest angle.
+  const rotRef = useRef(0);
+  const setRotation = (deg: number) => {
+    rotRef.current = deg;
+    setRotationState(deg);
+  };
   const [spinning, setSpinning] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
@@ -52,22 +58,70 @@ export default function Wheel({
   const seg = 360 / n;
   const R = 200;
 
-  function spin() {
+  // dir 1 = clockwise, -1 = counterclockwise; turns = how many full laps before landing.
+  function spin(dir: 1 | -1 = 1, turns = 5 + Math.floor(Math.random() * 3)) {
     if (spinning || n < 2) return;
     const winner = Math.floor(Math.random() * n);
     const offset = seg * (0.15 + Math.random() * 0.7); // land well inside the slice
     const targetAngle = winner * seg + offset; // angle of the point that ends at the pointer
+    const rotation = rotRef.current;
     const currentMod = ((rotation % 360) + 360) % 360;
     const wantMod = (360 - targetAngle) % 360;
     let delta = wantMod - currentMod;
     if (delta < 0) delta += 360;
-    const turns = 5 + Math.floor(Math.random() * 3);
-    setRotation(rotation + turns * 360 + delta);
+    if (dir === -1) delta -= 360;
+    setRotation(rotation + dir * turns * 360 + delta);
     setSpinning(true);
     timer.current = setTimeout(() => {
       setSpinning(false);
       onResult(items[winner]);
     }, SPIN_MS);
+  }
+
+  // ---- Drag to turn the wheel; flick it to spin ----
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ last: number; moved: number; samples: { t: number; a: number }[] } | null>(null);
+  const justDragged = useRef(false);
+
+  function angleAt(e: React.PointerEvent) {
+    const b = wrapRef.current!.getBoundingClientRect();
+    return (Math.atan2(e.clientY - (b.top + b.height / 2), e.clientX - (b.left + b.width / 2)) * 180) / Math.PI;
+  }
+
+  function onPointerDown(e: React.PointerEvent) {
+    if (spinning || disabled || n < 2 || (e.target as Element).closest(".hub")) return;
+    const a = angleAt(e);
+    drag.current = { last: a, moved: 0, samples: [{ t: e.timeStamp, a: 0 }] };
+  }
+
+  function onPointerMove(e: React.PointerEvent) {
+    const d = drag.current;
+    if (!d) return;
+    const a = angleAt(e);
+    let step = a - d.last;
+    if (step > 180) step -= 360; // crossing the ±180° seam
+    if (step < -180) step += 360;
+    d.last = a;
+    d.moved += step;
+    if (Math.abs(d.moved) > 4 && !wrapRef.current!.hasPointerCapture(e.pointerId)) wrapRef.current!.setPointerCapture(e.pointerId);
+    d.samples.push({ t: e.timeStamp, a: d.moved });
+    d.samples = d.samples.filter((s) => e.timeStamp - s.t < 120);
+    setRotation(rotRef.current + step);
+  }
+
+  function onPointerUp(e: React.PointerEvent) {
+    const d = drag.current;
+    drag.current = null;
+    if (!d) return;
+    if (Math.abs(d.moved) > 4) {
+      justDragged.current = true; // swallow the click that follows a drag
+      setTimeout(() => (justDragged.current = false), 50);
+    }
+    const first = d.samples[0];
+    const dt = e.timeStamp - first.t;
+    const v = dt > 0 ? (d.moved - first.a) / dt : 0; // degrees per ms
+    // A real flick (faster than ~300°/s) spins the wheel in that direction; a slow drag just leaves it there.
+    if (Math.abs(v) > 0.3) spin(v > 0 ? 1 : -1, Math.round(Math.min(8, Math.max(3, Math.abs(v) * 5))));
   }
 
   const maxChars = 18;
@@ -76,7 +130,14 @@ export default function Wheel({
   const t: Theme = THEMES[theme];
 
   return (
-    <div className="wheel-wrap">
+    <div
+      className="wheel-wrap"
+      ref={wrapRef}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={() => (drag.current = null)}
+    >
       <div className="pointer" aria-hidden />
       <svg
         viewBox="-210 -210 420 420"
@@ -103,7 +164,7 @@ export default function Wheel({
               role="button"
               tabIndex={spinning ? -1 : 0}
               aria-label={`See ${r.name}`}
-              onClick={() => !spinning && onPick(r)}
+              onClick={() => !spinning && !justDragged.current && onPick(r)}
               onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && !spinning && onPick(r)}
             >
               <path d={`M0 0 L${x0} ${y0} A${R} ${R} 0 ${large} 1 ${x1} ${y1} Z`} fill={sliceColor(theme, i, n)[0]} stroke={t.line} strokeWidth={2} />
@@ -139,7 +200,7 @@ export default function Wheel({
           return <circle key={i} cx={x} cy={y} r={4} fill={t.rim ? "#1d1d2c" : "#f7c548"} />;
         })}
       </svg>
-      <button className="hub" onClick={spin} disabled={spinning || disabled || n < 2}>
+      <button className="hub" onClick={() => spin()} disabled={spinning || disabled || n < 2}>
         {spinning ? "…" : "SPIN"}
       </button>
     </div>

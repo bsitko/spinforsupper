@@ -80,8 +80,9 @@ button:disabled { opacity: .6; cursor: default; }
 
 .stage { margin-top: 44px; padding-top: 12px; scroll-margin-top: 12px; }
 .wheel-wrap { position: relative; width: min(100%, 520px); aspect-ratio: 1; margin: 18px auto 0; }
-.wheel { width: 100%; height: 100%; display: block; filter: drop-shadow(0 12px 22px rgba(0,0,0,.2)); }
+.wheel { width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; filter: drop-shadow(0 12px 22px rgba(0,0,0,.2)); }
 .slice { cursor: pointer; outline: none; }
+.wheel:active { cursor: grabbing; }
 .slice path { transition: filter .15s; }
 .slice:hover path, .slice:focus-visible path { filter: brightness(1.12); }
 .pointer { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); width: 0; height: 0; z-index: 2;

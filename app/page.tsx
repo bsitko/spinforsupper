@@ -228,7 +228,7 @@ export default function Home() {
           {view === "wheel" ? (
             <>
               <Wheel items={items} theme={theme} onResult={(r) => setShown({ r, won: true })} onPick={(r) => setShown({ r, won: false })} />
-              <p className="hint">Hit SPIN · tap any slice to peek at it</p>
+              <p className="hint">Hit SPIN or flick the wheel · tap a slice to peek</p>
             </>
           ) : (
             <>
