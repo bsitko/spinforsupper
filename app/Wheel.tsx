@@ -2,7 +2,20 @@
 import { useEffect, useRef, useState } from "react";
 import type { Restaurant } from "@/lib/types";
 
-const COLORS = ["#ff6b35", "#f7c548", "#2ec4b6", "#e71d36", "#7b2cbf", "#3a86ff", "#06d6a0", "#ff006e", "#fb8500", "#8338ec", "#118ab2", "#ef476f"];
+// [slice fill, label color]
+const PALETTES = {
+  diner: [["#ff6b35", "#fff"], ["#fff1e0", "#1d1d2c"], ["#e2432a", "#fff"], ["#ffcf86", "#1d1d2c"]],
+  gameshow: [["#ff6b35", "#fff"], ["#1d1d2c", "#fff"]],
+  sunset: [["#ff6b35", "#fff"], ["#ffb35c", "#1d1d2c"], ["#e8434f", "#fff"], ["#ff8f45", "#fff"]],
+} as const;
+const PALETTE = PALETTES.diner;
+
+// Pick slice colors so neighbors never match, including the last slice next to the first.
+function sliceColor(i: number, n: number): readonly [string, string] {
+  const k = PALETTE.length;
+  if (i === n - 1 && n > 1 && i % k === 0) return k > 2 ? PALETTE[1] : ["#f7c548", "#1d1d2c"];
+  return PALETTE[i % k];
+}
 const SPIN_MS = 5200;
 
 function polar(r: number, deg: number) {
@@ -52,8 +65,8 @@ export default function Wheel({
     }, SPIN_MS);
   }
 
-  const maxChars = n > 9 ? 14 : 17;
-  const fontSize = n > 9 ? 13 : n > 6 ? 16 : 19;
+  const maxChars = n > 9 ? 13 : 14;
+  const fontSize = n > 9 ? 13 : n > 6 ? 17 : 19;
 
   return (
     <div className="wheel-wrap">
@@ -86,9 +99,9 @@ export default function Wheel({
               onClick={() => !spinning && onPick(r)}
               onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && !spinning && onPick(r)}
             >
-              <path d={`M0 0 L${x0} ${y0} A${R} ${R} 0 ${large} 1 ${x1} ${y1} Z`} fill={COLORS[i % COLORS.length]} stroke="#fff" strokeWidth={2} />
+              <path d={`M0 0 L${x0} ${y0} A${R} ${R} 0 ${large} 1 ${x1} ${y1} Z`} fill={sliceColor(i, n)[0]} stroke="#1d1d2c" strokeWidth={2} />
               <g transform={`rotate(${mid - 90})`} pointerEvents="none">
-                <text x={R - 14} y={0} textAnchor="end" dominantBaseline="middle" fontSize={fontSize} fontWeight={700} fill="#fff" style={{ paintOrder: "stroke", stroke: "rgba(0,0,0,.25)", strokeWidth: 3 }}>
+                <text x={R - 14} y={0} textAnchor="end" dominantBaseline="middle" fontSize={fontSize} fontWeight={800} fill={sliceColor(i, n)[1]}>
                   {short(r.name, maxChars)}
                 </text>
               </g>
