@@ -33,6 +33,10 @@ const raw: [string, string, number, boolean, number][] = [
   ["Root & Leaf", "vegetarian", 3, false, 4.6],
   ["Steak & Stone", "american", 4, false, 4.8],
   ["Little Lisbon", "seafood", 3, false, 4.5],
+  ["The Velvet Shaker", "cocktails", 3, false, 4.7],
+  ["Bitters & Bloom", "cocktails", 2, false, 4.5],
+  ["Midnight Negroni", "cocktails", 3, false, 4.6],
+  ["The Gimlet Room", "cocktails", 4, false, 4.8],
 ];
 
 export function demoRestaurants(): Restaurant[] {
@@ -47,7 +51,7 @@ export function demoRestaurants(): Restaurant[] {
     openNow: i % 5 !== 0,
     address: `${100 + i * 7} Main St (demo)`,
     phone: `(555) 01${String(i).padStart(2, "0")}-0000`,
-    category: cuisine[0].toUpperCase() + cuisine.slice(1) + " restaurant",
+    category: cuisine === "cocktails" ? "Cocktail bar" : cuisine[0].toUpperCase() + cuisine.slice(1) + " restaurant",
     mapsUrl: `https://www.google.com/maps/search/${encodeURIComponent(name)}`,
   }));
 }

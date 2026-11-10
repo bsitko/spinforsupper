@@ -1,3 +1,6 @@
+// `query` / `type` override the default "<label> restaurants" search (Google Places primary type).
+type Cuisine = { id: string; label: string; emoji: string; query?: string; type?: string };
+
 export const CUISINES = [
   { id: "any", label: "Surprise me", emoji: "🎲" },
   { id: "american", label: "American", emoji: "🍔" },
@@ -13,6 +16,7 @@ export const CUISINES = [
   { id: "breakfast", label: "Breakfast / Brunch", emoji: "🥞" },
   { id: "seafood", label: "Seafood", emoji: "🦐" },
   { id: "vegetarian", label: "Vegetarian", emoji: "🥗" },
-] as const;
+  { id: "cocktails", label: "Cocktails", emoji: "🍸", query: "cocktail bars", type: "bar" },
+] as const satisfies readonly Cuisine[];
 
 export type CuisineId = (typeof CUISINES)[number]["id"];

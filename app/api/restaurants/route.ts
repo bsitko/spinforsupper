@@ -127,13 +127,13 @@ export async function GET(req: NextRequest) {
 
   // ---- Google Places API (New) Text Search: one search per craving ----
   async function search(cuisine: string, pageToken?: string) {
-    const label = CUISINES.find((c) => c.id === cuisine)?.label;
-    const what = cuisine === "any" || !label ? "restaurants" : `${label} restaurants`;
+    const c = CUISINES.find((c) => c.id === cuisine);
+    const what = !c || cuisine === "any" ? "restaurants" : "query" in c ? c.query : `${c.label} restaurants`;
     // "pizza restaurants in Austin, TX" / "restaurants in 60614": Google resolves the place itself.
     const reqBody: Record<string, unknown> = {
       textQuery: where ? `${what} in ${where}` : what,
       pageSize: 20,
-      includedType: "restaurant",
+      includedType: c && "type" in c ? c.type : "restaurant",
     };
     if (!where) reqBody.locationBias = { circle: { center: { latitude: lat, longitude: lng }, radius: 8000 } };
     if (prices.length) reqBody.priceLevels = prices.map((n) => PRICE_ENUM[n]);
