@@ -61,7 +61,8 @@ export default function Wheel({
     }, SPIN_MS);
   }
 
-  const maxChars = n > 9 ? 13 : 14;
+  const maxChars = 18;
+  const room = R - 14 - 66; // space between label start and the SPIN hub
   const fontSize = n > 9 ? 13 : n > 6 ? 17 : 19;
   const t: Theme = THEMES[theme];
 
@@ -98,7 +99,7 @@ export default function Wheel({
             >
               <path d={`M0 0 L${x0} ${y0} A${R} ${R} 0 ${large} 1 ${x1} ${y1} Z`} fill={sliceColor(theme, i, n)[0]} stroke={t.line} strokeWidth={2} />
               <g transform={`rotate(${mid - 90})`} pointerEvents="none">
-                <text x={R - 14} y={0} textAnchor="end" dominantBaseline="middle" fontSize={fontSize} fontWeight={800} fill={sliceColor(theme, i, n)[1]} style={t.textShadow ? { paintOrder: "stroke", stroke: "rgba(0,0,0,.25)", strokeWidth: 3 } : undefined}>
+                <text x={R - 14} y={0} textAnchor="end" dominantBaseline="middle" fontSize={Math.min(fontSize, room / (short(r.name, maxChars).length * 0.62))} fontWeight={800} fill={sliceColor(theme, i, n)[1]} style={t.textShadow ? { paintOrder: "stroke", stroke: "rgba(0,0,0,.25)", strokeWidth: 3 } : undefined}>
                   {short(r.name, maxChars)}
                 </text>
               </g>
