@@ -26,7 +26,10 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [items, setItems] = useState<Restaurant[]>([]);
+  const [items, setItems] = useState<Restaurant[]>([]); // on the wheel
+  const [pool, setPool] = useState<Restaurant[]>([]); // everything that matched, for the list
+  const [view, setView] = useState<"wheel" | "list">("wheel");
+  const [loadedAt, setLoadedAt] = useState(0);
   const [shown, setShown] = useState<{ r: Restaurant; won: boolean } | null>(null);
   const stageRef = useRef<HTMLElement>(null);
   const [theme, setThemeState] = useState<ThemeId>("diner");
@@ -53,9 +56,10 @@ export default function Home() {
     } catch {}
   }
 
+  // Scroll down to the results each time a new batch loads.
   useEffect(() => {
-    if (items.length >= 2) stageRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [items]);
+    if (loadedAt) stageRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loadedAt]);
 
   function useMyLocation() {
     if (!navigator.geolocation) return setError("Your browser can't share location. Type a zip or city instead.");
@@ -110,8 +114,13 @@ export default function Home() {
       setNotice(data.message || "");
       if (data.restaurants.length < 2) {
         setItems([]);
+        setPool([]);
         setError("Not enough places matched. Loosen the filters a little.");
-      } else setItems(data.restaurants);
+      } else {
+        setItems(data.restaurants);
+        setPool(data.pool?.length ? data.pool : data.restaurants);
+        setLoadedAt(Date.now());
+      }
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -126,7 +135,7 @@ export default function Home() {
   }
 
   // Rank by rating, trusting ratings with more reviews (a 5.0 from 3 reviews shouldn't beat a 4.7 from 900).
-  const ranked = [...items].sort((a, b) => score(b) - score(a));
+  const ranked = [...pool].sort((a, b) => score(b) - score(a));
 
   const usingLocation = !!coords && !zip.trim();
   const r = shown?.r;
@@ -200,44 +209,62 @@ export default function Home() {
       </section>
 
       <button className="go" onClick={loadWheel} disabled={loading}>
-        {loading ? "Finding food…" : items.length ? "🔄 New wheel" : "Make my wheel!"}
+        {loading ? "Finding food…" : items.length ? "🔄 Search again" : "Find me food!"}
       </button>
       {error && <p className="error">{error}</p>}
 
       {items.length >= 2 && (
         <section className="stage" ref={stageRef}>
           {notice && <p className="notice">{notice}</p>}
-          <Wheel items={items} theme={theme} onResult={(r) => setShown({ r, won: true })} onPick={(r) => setShown({ r, won: false })} />
-          <p className="hint">Hit SPIN · tap any slice to peek at it</p>
+          <div className="views" role="tablist" aria-label="Show results as">
+            <button type="button" role="tab" aria-selected={view === "wheel"} className={`big ${view === "wheel" ? "on" : ""}`} onClick={() => setView("wheel")}>
+              🎡 Wheel
+            </button>
+            <button type="button" role="tab" aria-selected={view === "list"} className={`big ${view === "list" ? "on" : ""}`} onClick={() => setView("list")}>
+              📋 List
+            </button>
+          </div>
+
+          {view === "wheel" ? (
+            <>
+              <Wheel items={items} theme={theme} onResult={(r) => setShown({ r, won: true })} onPick={(r) => setShown({ r, won: false })} />
+              <p className="hint">Hit SPIN · tap any slice to peek at it</p>
+            </>
+          ) : (
+            <>
+              <p className="hint list-hint">
+                {ranked.length} places, best rated first · tap one for details
+              </p>
+              <ol className="picks">
+                {ranked.map((p, i) => (
+                  <li key={p.id}>
+                    <button type="button" className="pick" onClick={() => setShown({ r: p, won: false })}>
+                      <span className="rank">{i < 3 ? ["🥇", "🥈", "🥉"][i] : i + 1}</span>
+                      <span className="pick-body">
+                        <span className="pick-name">{p.name}</span>
+                        <span className="pick-meta">
+                          {[
+                            p.rating ? `⭐ ${p.rating.toFixed(1)}${p.ratingCount ? ` (${p.ratingCount})` : ""}` : null,
+                            dollars(p.price) || null,
+                            p.category || null,
+                            p.kidFriendly ? "👶" : null,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </span>
+                        {p.address && <span className="pick-addr">{p.address}</span>}
+                      </span>
+                      <span className="chev" aria-hidden>›</span>
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            </>
+          )}
+
           <button type="button" className="big regen" onClick={loadWheel} disabled={loading}>
-            {loading ? "Finding food…" : "🔄 Regenerate"}
+            {loading ? "Finding food…" : view === "wheel" ? "🔄 New wheel" : "🔄 New list"}
           </button>
-
-          <h2 className="list-title">Our top picks</h2>
-          <ol className="picks">
-            {ranked.map((p, i) => (
-              <li key={p.id}>
-                <button type="button" className="pick" onClick={() => setShown({ r: p, won: false })}>
-                  <span className="rank">{i < 3 ? ["🥇", "🥈", "🥉"][i] : i + 1}</span>
-                  <span className="pick-body">
-                    <span className="pick-name">{p.name}</span>
-                    <span className="pick-meta">
-                      {[
-                        p.rating ? `⭐ ${p.rating.toFixed(1)}${p.ratingCount ? ` (${p.ratingCount})` : ""}` : null,
-                        dollars(p.price) || null,
-                        p.category || null,
-                        p.kidFriendly ? "👶" : null,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </span>
-                  </span>
-                  <span className="chev" aria-hidden>›</span>
-                </button>
-              </li>
-            ))}
-          </ol>
-
         </section>
       )}
 

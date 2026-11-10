@@ -16,6 +16,7 @@ export type Restaurant = {
 
 export type SearchResponse = {
   source: "google" | "demo";
-  restaurants: Restaurant[];
+  restaurants: Restaurant[]; // the wheel
+  pool: Restaurant[]; // everything that matched (up to 20), for the list view
   message?: string;
 };

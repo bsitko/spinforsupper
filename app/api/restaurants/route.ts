@@ -37,6 +37,15 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
+const POOL_SIZE = 20;
+
+// The list view: the wheel's places plus up to POOL_SIZE others that matched.
+function makePool(wheel: Restaurant[], groups: Restaurant[][]): Restaurant[] {
+  const ids = new Set(wheel.map((r) => r.id));
+  const rest = roundRobin(groups, POOL_SIZE * 2).filter((r) => !ids.has(r.id));
+  return [...wheel, ...rest].slice(0, Math.max(POOL_SIZE, wheel.length));
+}
+
 // Pick `count` items, taking turns between groups so every craving gets slices.
 function roundRobin<T>(groups: T[][], count: number): T[] {
   const qs = groups.map(shuffle).filter((g) => g.length);
@@ -106,9 +115,11 @@ export async function GET(req: NextRequest) {
       (r) => (prices.length === 0 || prices.includes(r.price!)) && (!kids || r.kidFriendly) && (!openNow || r.openNow)
     );
     const groups = cuisines[0] === "any" ? [all] : cuisines.map((c) => all.filter((r) => r.cuisine === c));
+    const wheel = shuffle(roundRobin(groups, count));
     const body: SearchResponse = {
       source: "demo",
-      restaurants: shuffle(roundRobin(groups, count)),
+      restaurants: wheel,
+      pool: makePool(wheel, groups),
       message: "Demo mode: these are made-up restaurants. Add a Google Places API key for real ones.",
     };
     return NextResponse.json(body);
@@ -162,8 +173,8 @@ export async function GET(req: NextRequest) {
     // The same place can show up under two cravings; keep it in the first group only.
     const seen = new Set<string>();
     const groups = results.map((list) => kidFilter(list.filter((r) => !seen.has(r.id) && seen.add(r.id))));
-    const picked = roundRobin(groups, count);
-    const body: SearchResponse = { source: "google", restaurants: shuffle(picked) };
+    const picked = shuffle(roundRobin(groups, count));
+    const body: SearchResponse = { source: "google", restaurants: picked, pool: makePool(picked, groups) };
     if (!picked.length) body.message = "No restaurants matched. Try loosening the filters.";
     return NextResponse.json(body);
   } catch (e) {

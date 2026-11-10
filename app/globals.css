@@ -128,3 +128,6 @@ button:disabled { opacity: .6; cursor: default; }
 .themes { margin-top: 0; }
 .theme-picker { margin-top: 48px; }
 .theme .swatch { border-color: var(--ink); }
+.views { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px; }
+.list-hint { margin: 10px 0 14px; }
+.pick-addr { color: var(--muted); font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
