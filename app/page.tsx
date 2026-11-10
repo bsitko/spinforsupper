@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import Wheel from "./Wheel";
 import { CUISINES } from "@/lib/cuisines";
+import { THEMES, THEME_IDS, type ThemeId } from "@/lib/themes";
 import type { Restaurant, SearchResponse } from "@/lib/types";
 
 const dollars = (n?: number) => (n ? "$".repeat(n) : "");
@@ -21,6 +22,21 @@ export default function Home() {
   const [items, setItems] = useState<Restaurant[]>([]);
   const [shown, setShown] = useState<{ r: Restaurant; won: boolean } | null>(null);
   const stageRef = useRef<HTMLElement>(null);
+  const [theme, setThemeState] = useState<ThemeId>("diner");
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("wheel-theme") as ThemeId | null;
+      if (saved && saved in THEMES) setThemeState(saved);
+    } catch {}
+  }, []);
+
+  function setTheme(t: ThemeId) {
+    setThemeState(t);
+    try {
+      localStorage.setItem("wheel-theme", t);
+    } catch {}
+  }
 
   useEffect(() => {
     if (items.length >= 2) stageRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -160,8 +176,23 @@ export default function Home() {
       {items.length >= 2 && (
         <section className="stage" ref={stageRef}>
           {notice && <p className="notice">{notice}</p>}
-          <Wheel items={items} onResult={(r) => setShown({ r, won: true })} onPick={(r) => setShown({ r, won: false })} />
+          <Wheel items={items} theme={theme} onResult={(r) => setShown({ r, won: true })} onPick={(r) => setShown({ r, won: false })} />
           <p className="hint">Hit SPIN · tap any slice to peek at it</p>
+          <div className="themes" role="radiogroup" aria-label="Wheel colors">
+            {THEME_IDS.map((id) => (
+              <button
+                key={id}
+                type="button"
+                role="radio"
+                aria-checked={theme === id}
+                className={`theme ${theme === id ? "on" : ""}`}
+                onClick={() => setTheme(id)}
+              >
+                <span className="swatch" style={{ background: `conic-gradient(${THEMES[id].slices.slice(0, 4).map((s, i, a) => `${s[0]} ${(i * 100) / a.length}% ${((i + 1) * 100) / a.length}%`).join(", ")})` }} />
+                {THEMES[id].label}
+              </button>
+            ))}
+          </div>
         </section>
       )}
 
