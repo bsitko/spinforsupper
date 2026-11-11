@@ -11,6 +11,20 @@ import { loadFavorites, loadWheels, saveFavorites, saveWheels, type SavedWheel }
 
 const dollars = (n?: number) => (n ? "$".repeat(n) : "");
 
+// "19 Main St, Chicago, IL 60614, USA" -> "Chicago, IL". The most common one shows where Google searched,
+// so someone who typed "Springfield" can tell which Springfield they got.
+function areaOf(list: Restaurant[]) {
+  const counts = new Map<string, number>();
+  for (const r of list) {
+    const parts = r.address.split(",").map((s) => s.trim());
+    if (parts.length < 3) continue;
+    const region = parts[parts.length - 2].replace(/\s*[\d-]+$/, "");
+    const key = `${parts[parts.length - 3]}, ${region}`;
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  return [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "";
+}
+
 function score(r: Restaurant) {
   if (!r.rating) return 0;
   const v = r.ratingCount ?? 0;
@@ -311,7 +325,7 @@ export default function Home() {
           <input
             className="big-input"
             maxLength={80}
-            placeholder="Zip or city"
+            placeholder="Zip, city, or neighborhood"
             value={zip}
             onChange={(e) => setZip(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && loadWheel()}
@@ -379,6 +393,7 @@ export default function Home() {
       {items.length >= 2 && (
         <section className="stage" ref={stageRef}>
           {notice && <p className="notice">{notice}</p>}
+          {source === "google" && areaOf(pool) && <p className="area">📍 Near {areaOf(pool)}</p>}
           <div className="views" role="tablist" aria-label="Show results as">
             <button type="button" role="tab" aria-selected={view === "wheel"} className={`big ${view === "wheel" ? "on" : ""}`} onClick={() => (setView("wheel"), track("view", { as: "wheel" }))}>
               🎡 Wheel
