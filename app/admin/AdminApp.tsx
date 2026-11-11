@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Settings } from "@/lib/store";
 
-type Day = { day: string; searches: number; calls: number; photos: number; capped: number; clicks: Record<string, number> };
+type Day = { day: string; searches: number; calls: number; photos: number; capped: number; quota?: number; clicks: Record<string, number> };
 type Data = {
   settings: Settings;
   stats: { days: Day[]; cravings: [string, number][]; month: string };
@@ -121,6 +121,14 @@ export default function AdminApp({ loggedIn, configured }: { loggedIn: boolean; 
       )}
       {!data.googleKey && <p className="card warn">No Google Places key is set, so everyone sees demo restaurants.</p>}
 
+      {(data.stats.days[0]?.quota ?? 0) > 0 && (
+        <p className="card warn">
+          Google turned down {data.stats.days[0].quota} searches today because of a quota set in Google Cloud. Visitors saw sample spots. Check Places API (New) → Quotas.
+        </p>
+      )}
+      {s.paused && <p className="card warn">Paused: everyone is seeing sample spots.</p>}
+      {s.dailyCap > 0 && data.today + 1 > s.dailyCap && <p className="card warn">Today&apos;s cap of {s.dailyCap} calls is used up, so visitors see sample spots until midnight Pacific.</p>}
+
       {/* ---- Today ---- */}
       <section className="card">
         <h2>Today</h2>
@@ -170,12 +178,12 @@ export default function AdminApp({ loggedIn, configured }: { loggedIn: boolean; 
         <div className="scroll">
           <table>
             <thead>
-              <tr><th>Day</th><th>Searches</th><th>Google calls</th><th>Photos</th><th>Est. cost</th><th>Hit cap / paused</th><th>Book</th><th>Order</th><th>Maps</th></tr>
+              <tr><th>Day</th><th>Searches</th><th>Google calls</th><th>Photos</th><th>Est. cost</th><th>Hit cap / paused</th><th>Google said no</th><th>Book</th><th>Order</th><th>Maps</th></tr>
             </thead>
             <tbody>
               {data.stats.days.map((d) => (
                 <tr key={d.day}>
-                  <td>{d.day}</td><td>{d.searches}</td><td>{d.calls}</td><td>{d.photos || 0}</td><td>{money(cost(d.calls, d.photos || 0))}</td><td>{d.capped}</td>
+                  <td>{d.day}</td><td>{d.searches}</td><td>{d.calls}</td><td>{d.photos || 0}</td><td>{money(cost(d.calls, d.photos || 0))}</td><td>{d.capped}</td><td>{d.quota || 0}</td>
                   <td>{d.clicks.book || 0}</td><td>{d.clicks.order || 0}</td><td>{d.clicks.maps || 0}</td>
                 </tr>
               ))}

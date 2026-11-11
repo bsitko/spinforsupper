@@ -252,7 +252,7 @@ export async function GET(req: NextRequest) {
     if (failures.length === settled.length) {
       // Google says we're over quota (429): show sample spots with the friendly note instead of an error.
       if (failures.some((f) => f?.status === 429)) {
-        await recordSearch({ calls: 0, cravings: cuisines, served: "capped" });
+        await recordSearch({ calls: 0, cravings: cuisines, served: "quota" });
         return respond(demo(restMsg));
       }
       throw failures[0];

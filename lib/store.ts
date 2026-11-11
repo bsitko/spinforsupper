@@ -75,7 +75,7 @@ export async function callsToday() {
   return Number(h.calls || 0);
 }
 
-export async function recordSearch(opts: { calls: number; cravings: string[]; served: "google" | "demo" | "capped" | "paused" }) {
+export async function recordSearch(opts: { calls: number; cravings: string[]; served: "google" | "demo" | "capped" | "paused" | "quota" }) {
   const day = dayKey();
   try {
     await hincr(`stats:${day}`, "searches");
@@ -115,6 +115,7 @@ export async function getStats(days = 14) {
       calls: Number(s.calls || 0),
       photos: Number(s.photos || 0),
       capped: Number(s.capped || 0) + Number(s.paused || 0),
+      quota: Number(s.quota || 0), // Google itself said no (over a quota set in Google Cloud)
       clicks: Object.fromEntries(Object.entries(c).map(([k, v]) => [k, Number(v)])),
     });
   }
