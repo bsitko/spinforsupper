@@ -274,7 +274,8 @@ export default function Home() {
         setItems(wheel);
         setPool(all);
         setLoadedAt(Date.now());
-        lastQuery.current = qs.toString();
+        // Only reuse real results. Sample spots (paused, capped, Google said no) should retry for real next time.
+        lastQuery.current = data.source === "google" && !data.message ? qs.toString() : "";
       }
     } catch (err) {
       setError((err as Error).message);
