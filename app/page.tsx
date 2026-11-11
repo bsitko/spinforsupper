@@ -199,6 +199,7 @@ export default function Home() {
   return (
     <main>
       <header>
+        <ThemeMenu theme={theme} onPick={setTheme} />
         <Logo className="logo" />
         <h1>
           Spin for
@@ -333,24 +334,6 @@ export default function Home() {
         </section>
       )}
 
-      <section className="theme-picker">
-        <h2 className="list-title">Pick a theme</h2>
-        <div className="themes" role="radiogroup" aria-label="Wheel colors">
-          {THEME_IDS.map((id) => (
-            <button
-              key={id}
-              type="button"
-              role="radio"
-              aria-checked={theme === id}
-              className={`theme ${theme === id ? "on" : ""}`}
-              onClick={() => setTheme(id)}
-            >
-              <span className="swatch" style={{ background: `conic-gradient(${THEMES[id].slices.slice(0, 4).map((s, i, a) => `${s[0]} ${(i * 100) / a.length}% ${((i + 1) * 100) / a.length}%`).join(", ")})` }} />
-              {THEMES[id].label}
-            </button>
-          ))}
-        </div>
-      </section>
 
       {r && (
         <div className="modal" onClick={() => setShown(null)}>
@@ -436,5 +419,54 @@ export default function Home() {
         </p>
       </footer>
     </main>
+  );
+}
+
+function swatchBg(id: ThemeId) {
+  const sl = THEMES[id].slices.slice(0, 4);
+  return `conic-gradient(${sl.map((c, i) => `${c[0]} ${(i * 100) / sl.length}% ${((i + 1) * 100) / sl.length}%`).join(", ")})`;
+}
+
+// Small "Theme" button in the top corner that opens the color picker.
+function ThemeMenu({ theme, onPick }: { theme: ThemeId; onPick: (t: ThemeId) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("pointerdown", away);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("pointerdown", away);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [open]);
+  return (
+    <div className="theme-menu" ref={ref}>
+      <button type="button" className="theme-toggle" aria-expanded={open} aria-haspopup="true" onClick={() => setOpen(!open)}>
+        <span className="swatch sm" style={{ background: swatchBg(theme) }} />
+        Theme <span aria-hidden>{open ? "▴" : "▾"}</span>
+      </button>
+      {open && (
+        <div className="theme-pop">
+          <div className="themes" role="radiogroup" aria-label="Wheel colors">
+            {THEME_IDS.map((id) => (
+              <button
+                key={id}
+                type="button"
+                role="radio"
+                aria-checked={theme === id}
+                className={`theme ${theme === id ? "on" : ""}`}
+                onClick={() => (onPick(id), setOpen(false))}
+              >
+                <span className="swatch" style={{ background: swatchBg(id) }} />
+                {THEMES[id].label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
