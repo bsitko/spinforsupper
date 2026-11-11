@@ -262,3 +262,11 @@ button:disabled { opacity: .6; cursor: default; }
 .reviews .more { background: none; border: none; padding: 4px 0 0; color: var(--accent); font-weight: 800; font-size: .95rem; }
 .actions .duo:empty { display: none; }
 .actions .duo { grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); }
+
+/* Place popup: photo + name + chips stay put, the rest scrolls (tall screens). Short screens scroll as one, with the pinned name bar. */
+@media (min-height: 760px) {
+  .result.split { display: flex; flex-direction: column; overflow: hidden; padding-bottom: 0; }
+  .result.split .pop-head { flex: none; }
+  .result.split .pop-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin: 0 -22px; padding: 0 22px 22px; border-top: 2px solid var(--line); padding-top: 14px; }
+  .result.split .photo { aspect-ratio: 16 / 8; }
+}

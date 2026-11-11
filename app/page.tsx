@@ -562,7 +562,7 @@ export default function Home() {
         <div className="modal" onClick={() => setShown(null)}>
           <div
             key={r.id}
-            className={`result ${shown.won ? "won" : ""}`}
+            className={`result split ${shown.won ? "won" : ""}`}
             onClick={(e) => e.stopPropagation()}
             onScroll={(e) => setPopScrolled(e.currentTarget.scrollTop > 140)}
             role="dialog"
@@ -586,6 +586,7 @@ export default function Home() {
                 ✕
               </button>
             </div>
+            <div className="pop-head">
             {r.photo && source === "google" && <Photo key={r.id} r={r} />}
             <p className="kicker">{shown.won ? "The wheel has spoken!" : "On the wheel"}</p>
             <h3>{r.name}</h3>
@@ -602,6 +603,9 @@ export default function Home() {
             </p>
             {r.description && <p className="blurb">{r.description}</p>}
             <Badges r={r} />
+            </div>
+            {/* On taller screens only this part scrolls, so the photo and name stay put. */}
+            <div className="pop-body">
             {r.reviewSummary && (
               <div className="reviews">
                 <p className="reviews-title">💬 What people say</p>
@@ -696,6 +700,7 @@ export default function Home() {
                   🚫 Block this place (admin)
                 </button>
               )}
+            </div>
             </div>
           </div>
         </div>
