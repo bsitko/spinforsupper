@@ -42,6 +42,9 @@ const ATMOSPHERE_FIELDS = [
   "places.delivery",
   "places.outdoorSeating",
 ].join(",");
+// Google's AI review summary. Same price tier; if Google ever rejects the field, we retry once without it.
+const SUMMARY_FIELD = "places.reviewSummary";
+let summaryOk = true;
 
 // Basic abuse guard: each IP gets a limited number of Google searches per window (per server instance).
 const RATE_WINDOW_MS = 10 * 60 * 1000;
@@ -101,6 +104,14 @@ function toRestaurant(pl: any, cuisine: string): Restaurant {
     ...(({ style, emoji }) => ({ style, styleEmoji: emoji }))(foodStyle(pl.primaryType, pl.types, cuisine, pl.primaryTypeDisplayName?.text)),
     cuisine,
     description: pl.editorialSummary?.text,
+    reviewSummary: pl.reviewSummary?.text?.text
+      ? {
+          text: pl.reviewSummary.text.text,
+          disclosure: pl.reviewSummary.disclosureText?.text || "Summarized with Gemini",
+          reviewsUrl: pl.reviewSummary.reviewsUri,
+          flagUrl: pl.reviewSummary.flagContentUri,
+        }
+      : undefined,
     serves: {
       reservable: pl.reservable,
       dineIn: pl.dineIn,
@@ -192,16 +203,26 @@ export async function GET(req: NextRequest) {
     if (prices.length) reqBody.priceLevels = prices.map((n) => PRICE_ENUM[n]);
     if (openNow) reqBody.openNow = true;
 
-    const res = await fetch(process.env.PLACES_API_URL || "https://places.googleapis.com/v1/places:searchText", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Goog-Api-Key": key!,
-        "X-Goog-FieldMask": `${FIELD_MASK},${ATMOSPHERE_FIELDS}`,
-      },
-      body: JSON.stringify(reqBody),
-      cache: "no-store",
-    });
+    const call = (withSummary: boolean) =>
+      fetch(process.env.PLACES_API_URL || "https://places.googleapis.com/v1/places:searchText", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": key!,
+          "X-Goog-FieldMask": `${FIELD_MASK},${ATMOSPHERE_FIELDS}${withSummary ? `,${SUMMARY_FIELD}` : ""}`,
+        },
+        body: JSON.stringify(reqBody),
+        cache: "no-store",
+      });
+    let res = await call(summaryOk);
+    if (res.status === 400 && summaryOk) {
+      const msg = await res.text();
+      if (/reviewSummary/i.test(msg)) {
+        console.error("Google rejected reviewSummary; turning it off.", msg);
+        summaryOk = false;
+        res = await call(false);
+      } else throw new Error(`Places API 400: ${msg}`);
+    }
     if (!res.ok) throw new Error(`Places API ${res.status}: ${await res.text()}`);
     return res.json() as Promise<{ places?: any[] }>;
   }

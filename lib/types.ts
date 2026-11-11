@@ -15,6 +15,8 @@ export type Restaurant = {
   style?: string; // short style of food, e.g. "Mexican"
   styleEmoji?: string;
   description?: string; // Google's one-line blurb, when it has one
+  // Google's AI summary of reviews; Google requires showing the disclosure and a "report" link with it.
+  reviewSummary?: { text: string; disclosure: string; reviewsUrl?: string; flagUrl?: string };
   serves?: { reservable?: boolean; dineIn?: boolean; takeout?: boolean; delivery?: boolean; outdoorSeating?: boolean };
   photo?: string; // Google photo reference; the image itself loads only when the popup opens
   photoBy?: { name: string; url?: string }; // Google requires crediting the photographer

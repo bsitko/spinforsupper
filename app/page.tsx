@@ -463,6 +463,31 @@ export default function Home() {
             </p>
             {r.description && <p className="blurb">{r.description}</p>}
             <Badges r={r} />
+            {r.reviewSummary && (
+              <div className="reviews">
+                <p className="reviews-title">💬 What people say</p>
+                <p>{r.reviewSummary.text}</p>
+                <p className="reviews-foot">
+                  {r.reviewSummary.disclosure}
+                  {r.reviewSummary.reviewsUrl && (
+                    <>
+                      {" · "}
+                      <a href={r.reviewSummary.reviewsUrl} target="_blank" rel="noreferrer">
+                        Read reviews
+                      </a>
+                    </>
+                  )}
+                  {r.reviewSummary.flagUrl && (
+                    <>
+                      {" · "}
+                      <a href={r.reviewSummary.flagUrl} target="_blank" rel="noreferrer">
+                        Report
+                      </a>
+                    </>
+                  )}
+                </p>
+              </div>
+            )}
             <p className="addr">{r.address}</p>
             {source === "google" && (
               <p className="attribution">
