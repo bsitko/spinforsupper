@@ -230,3 +230,16 @@ button:disabled { opacity: .6; cursor: default; }
 .pick-desc { font-size: .95rem; font-weight: 500; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin: 2px 0; }
 
 .area { text-align: center; font-weight: 800; font-size: 1.1rem; color: var(--muted); margin: 0 0 10px; }
+
+.wheel-toggle { flex: none; width: 64px; border-radius: 18px; background: var(--btn); color: var(--ink); border: 3px solid var(--line); font-size: 1.6rem; font-weight: 900; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; gap: 4px; }
+.wheel-toggle small { font-size: .7rem; font-weight: 800; color: var(--muted); }
+.wheel-toggle.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.wheel-toggle.on small { color: #fff; }
+.add-own { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin-top: 18px; }
+.add-own .big-input { font-size: 1.2rem; min-height: 60px; text-align: left; padding: 0 16px; }
+.add-own .big { min-height: 60px; padding: 0 18px; font-size: 1.15rem; }
+.small-hint { font-size: .95rem; margin-top: 8px; }
+
+.big.quiet { font-size: 1.05rem; min-height: 54px; color: var(--muted); }
+.hidden-name { font-weight: 800; }
+.del.undo { width: auto; padding: 0 14px; font-size: 1rem; font-weight: 800; color: var(--ink); }

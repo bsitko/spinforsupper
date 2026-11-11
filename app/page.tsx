@@ -7,7 +7,7 @@ import { CUISINES } from "@/lib/cuisines";
 import { THEMES, THEME_IDS, type Theme, type ThemeId } from "@/lib/themes";
 import type { Restaurant, SearchResponse } from "@/lib/types";
 import { pickParams } from "@/lib/share";
-import { loadFavorites, loadWheels, saveFavorites, saveWheels, type SavedWheel } from "@/lib/saved";
+import { loadFavorites, loadHidden, loadWheels, saveFavorites, saveHidden, saveWheels, type Hidden, type SavedWheel } from "@/lib/saved";
 
 const dollars = (n?: number) => (n ? "$".repeat(n) : "");
 
@@ -74,10 +74,34 @@ export default function Home() {
     toastTimer.current = setTimeout(() => setToast(""), 2200);
   }
 
+  const [hidden, setHidden] = useState<Hidden[]>([]);
   useEffect(() => {
     setFavorites(loadFavorites());
     setWheels(loadWheels());
+    setHidden(loadHidden());
   }, []);
+
+  // "We've been there, not for us": gone from this wheel and every future search on this device.
+  function hidePlace(p: Restaurant) {
+    const next = [{ id: p.id, name: p.name }, ...hidden.filter((h) => h.id !== p.id)];
+    setHidden(next);
+    saveHidden(next);
+    setItems((cur) => cur.filter((x) => x.id !== p.id));
+    setPool((cur) => cur.filter((x) => x.id !== p.id));
+    if (isFav(p)) {
+      const favs = favorites.filter((f) => f.id !== p.id);
+      setFavorites(favs);
+      saveFavorites(favs);
+    }
+    setShown(null);
+    track("hide_place");
+    say(`👎 Got it. You won’t see ${p.name} again.`);
+  }
+  function unhide(id: string) {
+    const next = hidden.filter((h) => h.id !== id);
+    setHidden(next);
+    saveHidden(next);
+  }
 
   const isFav = (p: Restaurant) => favorites.some((f) => f.id === p.id);
   function toggleFav(p: Restaurant) {
@@ -237,13 +261,18 @@ export default function Home() {
       if (!res.ok) throw new Error(data.error || "Something went wrong.");
       setNotice(data.message || "");
       setSource(data.source);
-      if (data.restaurants.length < 2) {
+      // Drop places this person said "not for us" to, and top the wheel back up from the other matches.
+      const gone = new Set(hidden.map((h) => h.id));
+      const all = (data.pool?.length ? data.pool : data.restaurants).filter((x) => !gone.has(x.id));
+      const wheel = data.restaurants.filter((x) => !gone.has(x.id));
+      for (const x of all) if (wheel.length < data.restaurants.length && !wheel.some((w) => w.id === x.id)) wheel.push(x);
+      if (wheel.length < 2) {
         setItems([]);
         setPool([]);
         setError("Not enough places matched. Loosen the filters a little.");
       } else {
-        setItems(data.restaurants);
-        setPool(data.pool?.length ? data.pool : data.restaurants);
+        setItems(wheel);
+        setPool(all);
         setLoadedAt(Date.now());
         lastQuery.current = qs.toString();
       }
@@ -290,6 +319,44 @@ export default function Home() {
     track("veto", { place: shown.r.name });
     setItems((cur) => cur.filter((r) => r.id !== shown.r.id));
     setShown(null);
+  }
+
+  // ---- Customizing the wheel: everything here is local, so it never costs a search ----
+  const MAX_SLICES = 12;
+  const onWheel = (p: Restaurant) => items.some((i) => i.id === p.id);
+  function toggleWheel(p: Restaurant) {
+    if (onWheel(p)) {
+      if (items.length <= 2) return say("The wheel needs at least 2 places");
+      setItems((cur) => cur.filter((i) => i.id !== p.id));
+      say(`Took ${p.name} off the wheel`);
+    } else {
+      if (items.length >= MAX_SLICES) return say(`The wheel fits ${MAX_SLICES} places. Take one off first.`);
+      setItems((cur) => [...cur, p]);
+      say(`🎡 Added ${p.name}`);
+    }
+    track("customize_wheel", { action: onWheel(p) ? "remove" : "add" });
+  }
+
+  const [custom, setCustom] = useState("");
+  function addCustom() {
+    const name = custom.trim().slice(0, 40);
+    if (!name) return;
+    if (items.length >= MAX_SLICES) return say(`The wheel fits ${MAX_SLICES} places. Take one off first.`);
+    const area = zip.trim() || areaOf(pool);
+    const p: Restaurant = {
+      id: `custom-${Date.now()}`,
+      name,
+      address: "",
+      cuisine: "custom",
+      style: "Your pick",
+      styleEmoji: "✍️",
+      mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([name, area].filter(Boolean).join(" "))}`,
+    };
+    setItems((cur) => [...cur, p]);
+    setPool((cur) => [...cur, p]);
+    setCustom("");
+    track("add_custom");
+    say(`🎡 Added ${name}`);
   }
 
   // Rank by rating, trusting ratings with more reviews (a 5.0 from 3 reviews shouldn't beat a 4.7 from 900).
@@ -407,15 +474,28 @@ export default function Home() {
             <>
               <Wheel items={items} theme={theme} onResult={(r) => (setShown({ r, won: true }), track("spin_result", { place: r.name }))} onPick={(r) => setShown({ r, won: false })} />
               <p className="hint">Hit SPIN or flick the wheel · tap a slice to peek</p>
+              <form
+                className="add-own"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  addCustom();
+                }}
+              >
+                <input className="big-input" maxLength={40} placeholder="Add your own spot" value={custom} onChange={(e) => setCustom(e.target.value)} aria-label="Add your own spot to the wheel" />
+                <button type="submit" className="big" disabled={!custom.trim()}>
+                  ＋ Add
+                </button>
+              </form>
+              <p className="hint small-hint">Or pick what’s on it from the 📋 List.</p>
             </>
           ) : (
             <>
               <p className="hint list-hint">
-                {ranked.length} places, best rated first · tap one for details
+                {ranked.length} places, best rated first · tap one for details, ＋ to put it on the wheel
               </p>
               <ol className="picks">
                 {ranked.map((p, i) => (
-                  <li key={p.id}>
+                  <li key={p.id} className="saved-row">
                     <button type="button" className="pick" onClick={() => setShown({ r: p, won: false })}>
                       <span className="rank">{i < 3 ? ["🥇", "🥈", "🥉"][i] : i + 1}</span>
                       <span className="pick-body">
@@ -433,7 +513,16 @@ export default function Home() {
                         {(p.description || p.reviewSummary) && <span className="pick-desc">{p.description || p.reviewSummary!.text}</span>}
                         {p.address && <span className="pick-addr">{p.address}</span>}
                       </span>
-                      <span className="chev" aria-hidden>›</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`wheel-toggle ${onWheel(p) ? "on" : ""}`}
+                      aria-pressed={onWheel(p)}
+                      aria-label={onWheel(p) ? `Take ${p.name} off the wheel` : `Add ${p.name} to the wheel`}
+                      onClick={() => toggleWheel(p)}
+                    >
+                      <span aria-hidden>{onWheel(p) ? "✓" : "＋"}</span>
+                      <small>wheel</small>
                     </button>
                   </li>
                 ))}
@@ -559,9 +648,19 @@ export default function Home() {
                   🌐 Website / menu
                 </a>
               )}
+              {!shown.won && items.length > 0 && (
+                <button className="big" onClick={() => (toggleWheel(r), setShown(null))}>
+                  {onWheel(r) ? "➖ Take off the wheel" : "➕ Add to the wheel"}
+                </button>
+              )}
               {shown.won && (
                 <button className="big" onClick={veto}>
                   🙅 Nope, spin again
+                </button>
+              )}
+              {!r.id.startsWith("custom-") && (
+                <button className="big quiet" onClick={() => hidePlace(r)}>
+                  👎 Been there, not for us
                 </button>
               )}
               {admin && source === "google" && (
@@ -607,6 +706,22 @@ export default function Home() {
               </ul>
             ) : (
               <p className="empty">Tap 🤍 Save on any place to keep it here.</p>
+            )}
+
+            {hidden.length > 0 && (
+              <>
+                <h4 className="list-title">👎 Hidden places</h4>
+                <ul className="picks">
+                  {hidden.map((h) => (
+                    <li key={h.id} className="saved-row">
+                      <span className="pick hidden-name">{h.name}</span>
+                      <button type="button" className="del undo" onClick={() => unhide(h.id)} aria-label={`Show ${h.name} again`}>
+                        Undo
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
             )}
 
             <h4 className="list-title">🎡 Saved wheels</h4>
