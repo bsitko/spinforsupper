@@ -77,7 +77,7 @@ export default function Wheel({
 
   // ---- Drag to turn the wheel; flick it to spin ----
   const wrapRef = useRef<HTMLDivElement>(null);
-  const drag = useRef<{ last: number; moved: number; samples: { t: number; a: number }[] } | null>(null);
+  const drag = useRef<{ last: number; moved: number; start: number; samples: { t: number; a: number }[] } | null>(null);
   const justDragged = useRef(false);
 
   function angleAt(e: React.PointerEvent) {
@@ -88,7 +88,7 @@ export default function Wheel({
   function onPointerDown(e: React.PointerEvent) {
     if (spinning || disabled || n < 2 || (e.target as Element).closest(".hub")) return;
     const a = angleAt(e);
-    drag.current = { last: a, moved: 0, samples: [{ t: e.timeStamp, a: 0 }] };
+    drag.current = { last: a, moved: 0, start: rotRef.current, samples: [{ t: e.timeStamp, a: 0 }] };
   }
 
   function onPointerMove(e: React.PointerEvent) {
@@ -133,7 +133,11 @@ export default function Wheel({
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-      onPointerCancel={() => (drag.current = null)}
+      // Up-and-down swipes scroll the page (touch-action: pan-y); the browser then cancels the drag, so undo any nudge.
+      onPointerCancel={() => {
+        if (drag.current) setRotation(drag.current.start);
+        drag.current = null;
+      }}
     >
       <div className="pointer" aria-hidden />
       <svg
