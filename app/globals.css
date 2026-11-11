@@ -243,3 +243,9 @@ button:disabled { opacity: .6; cursor: default; }
 .big.quiet { font-size: 1.05rem; min-height: 54px; color: var(--muted); }
 .hidden-name { font-weight: 800; }
 .del.undo { width: auto; padding: 0 14px; font-size: 1rem; font-weight: 800; color: var(--ink); }
+
+.footer-links .tip::before { content: " · "; font-weight: 400; }
+.about .logo { width: 88px; margin: 8px 0 0; }
+.about .go.tip { margin-top: 8px; max-width: 360px; }
+.about .muted-note { margin-top: 32px; }
+.legal a.go { color: #fff; }

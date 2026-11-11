@@ -197,6 +197,20 @@ export default function AdminApp({ loggedIn, configured }: { loggedIn: boolean; 
         )}
       </section>
 
+      {/* ---- Tip jar ---- */}
+      <section className="card">
+        <h2>Tip jar</h2>
+        <p className="muted">
+          Paste your Ko-fi or Buy Me a Coffee page link. A &quot;☕ Buy us a coffee&quot; link then shows in the footer and on the About page. Leave empty to hide it.
+        </p>
+        <label className="field">
+          <span>Tip link</span>
+          <input value={draft.tipUrl} onChange={(e) => setDraft({ ...draft, tipUrl: e.target.value })} placeholder="https://ko-fi.com/yourname" />
+        </label>
+        <button className="go small" onClick={() => save({ tipUrl: draft.tipUrl })}>Save tip link</button>
+        <p className="muted">Tip link clicks, last 14 days: {clickTotals.tip || 0}</p>
+      </section>
+
       {/* ---- Affiliate links ---- */}
       <section className="card">
         <h2>Book &amp; Order links</h2>

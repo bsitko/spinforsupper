@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
   if (body.dailyCap !== undefined) patch.dailyCap = Math.max(0, Math.floor(Number(body.dailyCap) || 0));
   if (body.paused !== undefined) patch.paused = !!body.paused;
   if (body.costPerCall !== undefined) patch.costPerCall = Math.max(0, Number(body.costPerCall) || 0);
-  for (const k of ["bookTemplate", "orderTemplate"] as const) {
+  for (const k of ["bookTemplate", "orderTemplate", "tipUrl"] as const) {
     if (body[k] !== undefined) {
       const v = String(body[k]).trim();
       if (v && !/^https:\/\//.test(v)) return NextResponse.json({ error: "Links must start with https://" }, { status: 400 });

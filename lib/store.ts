@@ -10,6 +10,7 @@ export type Settings = {
   costPerPhoto: number; // USD per restaurant photo loaded
   bookTemplate: string; // "Book a table" link; {name} {address} {query} are filled in, URL-encoded
   orderTemplate: string; // "Order delivery" link, same placeholders
+  tipUrl: string; // tip jar (Ko-fi, Buy Me a Coffee...); empty hides it
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -19,6 +20,7 @@ export const DEFAULT_SETTINGS: Settings = {
   costPerPhoto: 0.007,
   bookTemplate: "https://www.opentable.com/s?term={query}",
   orderTemplate: "https://www.doordash.com/search/store/{name}/",
+  tipUrl: "",
 };
 
 const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { recordClick } from "@/lib/store";
 
-const KINDS = new Set(["book", "order", "maps", "website"]);
+const KINDS = new Set(["book", "order", "maps", "website", "tip"]);
 
 // Counts outbound clicks for the admin report. Fire-and-forget from the browser.
 export async function POST(req: NextRequest) {

@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import Wheel from "./Wheel";
 import Logo from "./Logo";
+import TipLink from "./TipLink";
 import { track } from "@/lib/analytics";
 import { CUISINES } from "@/lib/cuisines";
 import { THEMES, THEME_IDS, type Theme, type ThemeId } from "@/lib/themes";
@@ -760,8 +761,9 @@ export default function Home() {
 
       <footer className="site-footer">
         <p>Some Book and Order links may earn us a small commission, at no cost to you.</p>
-        <p>
-          <a href="/privacy">Privacy</a>
+        <p className="footer-links">
+          <a href="/about">About</a> · <a href="/privacy">Privacy</a>
+          <TipLink />
         </p>
       </footer>
     </main>
