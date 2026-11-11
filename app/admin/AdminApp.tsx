@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Settings } from "@/lib/store";
 
-type Day = { day: string; searches: number; calls: number; capped: number; clicks: Record<string, number> };
+type Day = { day: string; searches: number; calls: number; photos: number; capped: number; clicks: Record<string, number> };
 type Data = {
   settings: Settings;
   stats: { days: Day[]; cravings: [string, number][]; month: string };
@@ -92,9 +92,11 @@ export default function AdminApp({ loggedIn, configured }: { loggedIn: boolean; 
   if (!data || !draft) return <main className="admin"><h1>Admin</h1><p>Loading…</p></main>;
 
   const s = data.settings;
-  const cost = (calls: number) => calls * s.costPerCall;
+  const cost = (calls: number, photos = 0) => calls * s.costPerCall + photos * s.costPerPhoto;
+  const todayPhotos = data.stats.days[0]?.photos ?? 0;
   const monthDays = data.stats.days.filter((d) => d.day.startsWith(data.stats.month));
   const monthCalls = monthDays.reduce((a, d) => a + d.calls, 0);
+  const monthPhotos = monthDays.reduce((a, d) => a + (d.photos || 0), 0);
   const capPct = s.dailyCap ? Math.min(100, Math.round((data.today / s.dailyCap) * 100)) : 0;
   const clickTotals = data.stats.days.reduce<Record<string, number>>((acc, d) => {
     for (const [k, v] of Object.entries(d.clicks)) acc[k] = (acc[k] || 0) + v;
@@ -125,7 +127,8 @@ export default function AdminApp({ loggedIn, configured }: { loggedIn: boolean; 
         <div className="tiles3">
           <div className="stat"><span className="n">{data.stats.days[0]?.searches ?? 0}</span>searches</div>
           <div className="stat"><span className="n">{data.today}</span>Google calls</div>
-          <div className="stat"><span className="n">{money(cost(data.today))}</span>est. cost</div>
+          <div className="stat"><span className="n">{todayPhotos}</span>photos</div>
+          <div className="stat"><span className="n">{money(cost(data.today, todayPhotos))}</span>est. cost</div>
         </div>
         {s.dailyCap > 0 && (
           <div className="meter" aria-label={`${capPct}% of daily cap used`}>
@@ -134,7 +137,7 @@ export default function AdminApp({ loggedIn, configured }: { loggedIn: boolean; 
           </div>
         )}
         <p className="muted">
-          This month so far: {monthCalls} calls, about {money(cost(monthCalls))} before Google&apos;s free allowance. Days reset at midnight Pacific, like Google&apos;s quota.
+          This month so far: {monthCalls} calls and {monthPhotos} photos, about {money(cost(monthCalls, monthPhotos))} before Google&apos;s free allowance. Days reset at midnight Pacific, like Google&apos;s quota.
         </p>
       </section>
 
@@ -167,12 +170,12 @@ export default function AdminApp({ loggedIn, configured }: { loggedIn: boolean; 
         <div className="scroll">
           <table>
             <thead>
-              <tr><th>Day</th><th>Searches</th><th>Google calls</th><th>Est. cost</th><th>Hit cap / paused</th><th>Book</th><th>Order</th><th>Maps</th></tr>
+              <tr><th>Day</th><th>Searches</th><th>Google calls</th><th>Photos</th><th>Est. cost</th><th>Hit cap / paused</th><th>Book</th><th>Order</th><th>Maps</th></tr>
             </thead>
             <tbody>
               {data.stats.days.map((d) => (
                 <tr key={d.day}>
-                  <td>{d.day}</td><td>{d.searches}</td><td>{d.calls}</td><td>{money(cost(d.calls))}</td><td>{d.capped}</td>
+                  <td>{d.day}</td><td>{d.searches}</td><td>{d.calls}</td><td>{d.photos || 0}</td><td>{money(cost(d.calls, d.photos || 0))}</td><td>{d.capped}</td>
                   <td>{d.clicks.book || 0}</td><td>{d.clicks.order || 0}</td><td>{d.clicks.maps || 0}</td>
                 </tr>
               ))}

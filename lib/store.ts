@@ -7,6 +7,7 @@ export type Settings = {
   dailyCap: number; // max billed Google calls per day (Pacific time, like Google's quota). 0 = no cap.
   paused: boolean; // kill switch: no Google calls at all, demo restaurants only
   costPerCall: number; // USD, for the cost estimate
+  costPerPhoto: number; // USD per restaurant photo loaded
   bookTemplate: string; // "Book a table" link; {name} {address} {query} are filled in, URL-encoded
   orderTemplate: string; // "Order delivery" link, same placeholders
 };
@@ -15,6 +16,7 @@ export const DEFAULT_SETTINGS: Settings = {
   dailyCap: 300,
   paused: false,
   costPerCall: 0.035,
+  costPerPhoto: 0.007,
   bookTemplate: "https://www.opentable.com/s?term={query}",
   orderTemplate: "https://www.doordash.com/search/store/{name}/",
 };
@@ -85,6 +87,14 @@ export async function recordSearch(opts: { calls: number; cravings: string[]; se
   }
 }
 
+export async function recordPhoto() {
+  try {
+    await hincr(`stats:${dayKey()}`, "photos");
+  } catch (e) {
+    console.error("recordPhoto failed", e);
+  }
+}
+
 export async function recordClick(kind: string) {
   try {
     await hincr(`clicks:${dayKey()}`, kind);
@@ -103,6 +113,7 @@ export async function getStats(days = 14) {
       day,
       searches: Number(s.searches || 0),
       calls: Number(s.calls || 0),
+      photos: Number(s.photos || 0),
       capped: Number(s.capped || 0) + Number(s.paused || 0),
       clicks: Object.fromEntries(Object.entries(c).map(([k, v]) => [k, Number(v)])),
     });

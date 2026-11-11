@@ -447,6 +447,7 @@ export default function Home() {
             <button className="close" onClick={() => setShown(null)} aria-label="Close">
               ✕
             </button>
+            {r.photo && source === "google" && <Photo key={r.id} r={r} />}
             <p className="kicker">{shown.won ? "The wheel has spoken!" : "On the wheel"}</p>
             <h3>{r.name}</h3>
             {r.style && (
@@ -641,5 +642,29 @@ function ThemeMenu({ theme, onPick }: { theme: ThemeId; onPick: (t: ThemeId) => 
         </div>
       )}
     </div>
+  );
+}
+
+// The restaurant's top Google photo. Hidden if it fails (paused, capped, or no photo).
+function Photo({ r }: { r: Restaurant }) {
+  const [ok, setOk] = useState(true);
+  if (!ok) return null;
+  return (
+    <figure className="photo">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={`/api/photo?name=${encodeURIComponent(r.photo!)}`} alt={r.name} onError={() => setOk(false)} />
+      {r.photoBy && (
+        <figcaption>
+          Photo:{" "}
+          {r.photoBy.url ? (
+            <a href={r.photoBy.url} target="_blank" rel="noreferrer">
+              {r.photoBy.name}
+            </a>
+          ) : (
+            r.photoBy.name
+          )}
+        </figcaption>
+      )}
+    </figure>
   );
 }

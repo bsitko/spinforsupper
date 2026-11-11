@@ -28,6 +28,7 @@ const FIELD_MASK = [
   "places.primaryTypeDisplayName",
   "places.primaryType",
   "places.types",
+  "places.photos", // just the photo reference: no extra charge until a photo is actually loaded
 ].join(",");
 // Kid-friendliness is an "Atmosphere" field, which Google bills at a higher rate, so only ask for it when needed.
 const KID_FIELDS = "places.goodForChildren,places.menuForChildren";
@@ -89,6 +90,10 @@ function toRestaurant(pl: any, cuisine: string): Restaurant {
     category: pl.primaryTypeDisplayName?.text,
     ...(({ style, emoji }) => ({ style, styleEmoji: emoji }))(foodStyle(pl.primaryType, pl.types, cuisine, pl.primaryTypeDisplayName?.text)),
     cuisine,
+    photo: pl.photos?.[0]?.name,
+    photoBy: pl.photos?.[0]?.authorAttributions?.[0]
+      ? { name: pl.photos[0].authorAttributions[0].displayName, url: pl.photos[0].authorAttributions[0].uri }
+      : undefined,
     mapsUrl: pl.googleMapsUri ?? `https://www.google.com/maps/place/?q=place_id:${pl.id}`,
   };
 }
