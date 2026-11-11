@@ -216,7 +216,8 @@ export async function GET(req: NextRequest) {
         body: JSON.stringify(reqBody),
         cache: "no-store",
       });
-    let res = await call(summaryOk);
+    let res = await call(summaryOk).catch(() => call(summaryOk)); // one retry on a network blip
+    if (res.status >= 500) res = await call(summaryOk); // and one on a Google hiccup
     if (res.status === 400 && summaryOk) {
       const msg = await res.text();
       if (/reviewSummary/i.test(msg)) {
@@ -225,7 +226,7 @@ export async function GET(req: NextRequest) {
         res = await call(false);
       } else throw new Error(`Places API 400: ${msg}`);
     }
-    if (!res.ok) throw new Error(`Places API ${res.status}: ${await res.text()}`);
+    if (!res.ok) throw Object.assign(new Error(`Places API ${res.status}: ${await res.text()}`), { status: res.status });
     return res.json() as Promise<{ places?: any[] }>;
   }
 
@@ -241,7 +242,22 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const [results, blocked] = await Promise.all([Promise.all(cuisines.map(placesFor)), getBlocked()]);
+    // One craving failing shouldn't sink the others; the blocklist (Redis) failing shouldn't sink anything.
+    const [settled, blocked] = await Promise.all([
+      Promise.allSettled(cuisines.map(placesFor)),
+      getBlocked().catch((e) => (console.error("getBlocked failed", e), {} as Record<string, string>)),
+    ]);
+    const failures = settled.filter((r): r is PromiseRejectedResult => r.status === "rejected").map((r) => r.reason);
+    for (const f of failures) console.error("Places search failed:", f?.message ?? f);
+    if (failures.length === settled.length) {
+      // Google says we're over quota (429): show sample spots with the friendly note instead of an error.
+      if (failures.some((f) => f?.status === 429)) {
+        await recordSearch({ calls: 0, cravings: cuisines, served: "capped" });
+        return respond(demo(restMsg));
+      }
+      throw failures[0];
+    }
+    const results = settled.map((r) => (r.status === "fulfilled" ? r.value : []));
     await recordSearch({ calls: cuisines.length, cravings: cuisines, served: "google" });
     // Blocked places (admin panel) are dropped. The same place can show up under two cravings; keep it once.
     const seen = new Set<string>(Object.keys(blocked));
@@ -252,6 +268,8 @@ export async function GET(req: NextRequest) {
     return respond(body);
   } catch (e) {
     console.error(e);
-    return NextResponse.json({ error: "Couldn't reach Google Places. Check the API key." }, { status: 502 });
+    const status = (e as { status?: number })?.status;
+    const why = status === 403 ? "the API key was refused" : status === 400 ? "Google didn't like the request" : status ? `Google error ${status}` : "no answer";
+    return NextResponse.json({ error: `Couldn't reach Google Places (${why}). Try again in a moment.` }, { status: 502 });
   }
 }
