@@ -26,6 +26,7 @@ export default function Home() {
   const [prices, setPrices] = useState<number[]>([]);
   const [kids, setKids] = useState(false);
   const [openNow, setOpenNow] = useState(true);
+  const [stars, setStars] = useState(0); // minimum rating: 0 = any
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -205,6 +206,7 @@ export default function Home() {
       prices: prices.join(","),
       kids: kids ? "1" : "0",
       open: openNow ? "1" : "0",
+      stars: String(stars),
       count: "8",
     });
     // Same filters as last time? Reshuffle what we already have instead of paying for another search.
@@ -339,12 +341,23 @@ export default function Home() {
 
       <section className="step">
         <h2>
-          <b>3</b> Budget? <small>pick any</small>
+          <b>3</b> Anything else?
         </h2>
         <div className="prices">
           {[1, 2, 3, 4].map((p) => (
             <button type="button" key={p} className={`big ${prices.includes(p) ? "on" : ""}`} onClick={() => togglePrice(p)}>
               {dollars(p)}
+            </button>
+          ))}
+        </div>
+        <div className="prices three" role="radiogroup" aria-label="Minimum rating">
+          {[
+            [0, "⭐ Any"],
+            [4, "⭐ 4+"],
+            [4.5, "⭐ 4.5+"],
+          ].map(([v, label]) => (
+            <button type="button" role="radio" key={v} aria-checked={stars === v} className={`big ${stars === v ? "on" : ""}`} onClick={() => setStars(v as number)}>
+              {label}
             </button>
           ))}
         </div>

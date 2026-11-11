@@ -145,6 +145,7 @@ export async function GET(req: NextRequest) {
     .filter((n) => n >= 1 && n <= 4);
   const kids = p.get("kids") === "1";
   const openNow = p.get("open") === "1";
+  const minRating = [4, 4.5].includes(Number(p.get("stars"))) ? Number(p.get("stars")) : 0;
   const count = Math.min(Math.max(parseInt(p.get("count") || "8", 10) || 8, 2), 12);
 
   const hasLocation = where.length > 1 || (!isNaN(lat) && !isNaN(lng));
@@ -171,7 +172,7 @@ export async function GET(req: NextRequest) {
   // ---- Demo restaurants: no key, kill switch on, or today's Google budget used up ----
   const demo = (message: string): SearchResponse => {
     const all = demoRestaurants().filter(
-      (r) => (prices.length === 0 || prices.includes(r.price!)) && (!kids || r.kidFriendly) && (!openNow || r.openNow)
+      (r) => (prices.length === 0 || prices.includes(r.price!)) && (!kids || r.kidFriendly) && (!openNow || r.openNow) && (r.rating ?? 0) >= minRating
     );
     const groups = cuisines[0] === "any" ? [all] : cuisines.map((c) => all.filter((r) => r.cuisine === c));
     const wheel = shuffle(roundRobin(groups, count));
@@ -202,6 +203,7 @@ export async function GET(req: NextRequest) {
     if (!where) reqBody.locationBias = { circle: { center: { latitude: lat, longitude: lng }, radius: 8000 } };
     if (prices.length) reqBody.priceLevels = prices.map((n) => PRICE_ENUM[n]);
     if (openNow) reqBody.openNow = true;
+    if (minRating) reqBody.minRating = minRating; // Google filters for us, at no extra cost
 
     const call = (withSummary: boolean) =>
       fetch(process.env.PLACES_API_URL || "https://places.googleapis.com/v1/places:searchText", {

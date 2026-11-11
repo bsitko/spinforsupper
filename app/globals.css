@@ -67,6 +67,7 @@ button:disabled { opacity: .6; cursor: default; }
 
 .prices { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .prices.two { grid-template-columns: 1fr 1fr; margin-top: 10px; }
+.prices.three { grid-template-columns: repeat(3, 1fr); margin-top: 10px; }
 .prices .big { padding: 0 8px; font-size: 1.25rem; }
 
 .go {
