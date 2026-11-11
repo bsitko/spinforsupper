@@ -54,6 +54,9 @@ export function foodStyle(primaryType: string | undefined, types: string[] = [],
   const c = CUISINES.find((c) => c.id === cuisine && c.id !== "any");
   if (c) return { style: c.label.replace(" / Sushi", ""), emoji: c.emoji };
   const name = (displayName || "").replace(/ restaurant$/i, "").trim();
-  if (name && !/^(restaurant|food|establishment)$/i.test(name)) return { style: name, emoji: "🍽️" };
+  if (name && !/^(restaurant|food|establishment)$/i.test(name)) {
+    const known = STYLES.find(([, label]) => label.toLowerCase() === name.toLowerCase());
+    return { style: name, emoji: known ? known[2] : "🍽️" };
+  }
   return { style: undefined, emoji: "🍽️" };
 }

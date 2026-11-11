@@ -29,6 +29,15 @@ export default function Home() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [source, setSource] = useState<"google" | "demo">("demo");
+  const [admin, setAdmin] = useState(false);
+
+  // Shows admin-only controls (like blocking a place) when you're logged in to /admin.
+  useEffect(() => {
+    fetch("/api/admin/me")
+      .then((r) => r.json())
+      .then((d) => setAdmin(!!d.admin))
+      .catch(() => {});
+  }, []);
   const [items, setItems] = useState<Restaurant[]>([]); // on the wheel
   const [pool, setPool] = useState<Restaurant[]>([]); // everything that matched, for the list
   const [view, setView] = useState<"wheel" | "list">("wheel");
@@ -153,6 +162,25 @@ export default function Home() {
     setItems(a.slice(0, 8));
     setShown(null);
     track("new_wheel");
+  }
+
+  // Count outbound clicks for the admin report (doesn't block navigation).
+  function countClick(kind: string) {
+    try {
+      const body = JSON.stringify({ kind });
+      if (!navigator.sendBeacon?.("/api/click", new Blob([body], { type: "application/json" }))) {
+        fetch("/api/click", { method: "POST", body, keepalive: true, headers: { "Content-Type": "application/json" } });
+      }
+    } catch {}
+  }
+
+  async function blockPlace(p: Restaurant) {
+    if (!confirm(`Hide "${p.name}" from everyone's results?`)) return;
+    const res = await fetch("/api/admin/block", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: p.id, name: p.name }) });
+    if (!res.ok) return alert("Couldn't block it. Are you still logged in?");
+    setItems((cur) => cur.filter((x) => x.id !== p.id));
+    setPool((cur) => cur.filter((x) => x.id !== p.id));
+    setShown(null);
   }
 
   function veto() {
@@ -364,11 +392,25 @@ export default function Home() {
               </p>
             )}
             <div className="actions">
-              <a className="go" href={r.mapsUrl} target="_blank" rel="noreferrer" onClick={() => track(shown.won ? "lets_go" : "open_listing", { place: r.name })}>
+              <a className="go" href={r.mapsUrl} target="_blank" rel="noreferrer" onClick={() => (track(shown.won ? "lets_go" : "open_listing", { place: r.name }), countClick("maps"))}>
                 {shown.won ? "🗺️ Let’s go!" : "🗺️ See on Google"}
               </a>
+              {(r.bookUrl || r.orderUrl) && (
+                <div className="duo">
+                  {r.bookUrl && (
+                    <a className="big" href={r.bookUrl} target="_blank" rel="noreferrer sponsored" onClick={() => (track("book", { place: r.name }), countClick("book"))}>
+                      📅 Book a table
+                    </a>
+                  )}
+                  {r.orderUrl && (
+                    <a className="big" href={r.orderUrl} target="_blank" rel="noreferrer sponsored" onClick={() => (track("order", { place: r.name }), countClick("order"))}>
+                      🛵 Order delivery
+                    </a>
+                  )}
+                </div>
+              )}
               {r.website && (
-                <a className="big" href={r.website} target="_blank" rel="noreferrer" onClick={() => track("open_website", { place: r.name })}>
+                <a className="big" href={r.website} target="_blank" rel="noreferrer" onClick={() => (track("open_website", { place: r.name }), countClick("website"))}>
                   🌐 Website / menu
                 </a>
               )}
@@ -377,10 +419,22 @@ export default function Home() {
                   🙅 Nope, spin again
                 </button>
               )}
+              {admin && source === "google" && (
+                <button className="big danger" onClick={() => blockPlace(r)}>
+                  🚫 Block this place (admin)
+                </button>
+              )}
             </div>
           </div>
         </div>
       )}
+
+      <footer className="site-footer">
+        <p>Some Book and Order links may earn us a small commission, at no cost to you.</p>
+        <p>
+          <a href="/privacy">Privacy</a>
+        </p>
+      </footer>
     </main>
   );
 }

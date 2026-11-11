@@ -60,3 +60,17 @@ Each search costs one billed Text Search call per craving (max 4). The app alrea
 
 On the Google Cloud side, also set a hard cap: **APIs & Services → Places API (New) → Quotas** → lower
 "Text Search requests per day" (e.g. 300), and add a budget alert under **Billing → Budgets & alerts**.
+
+## Admin panel (`/admin`)
+
+1. In Vercel, add `ADMIN_PASSWORD` (Settings → Environment Variables).
+2. Connect storage so counts and settings survive deploys: Vercel → Storage → **Upstash for Redis** → Create →
+   connect to this project (it adds `KV_REST_API_URL` / `KV_REST_API_TOKEN` automatically).
+3. Redeploy, then open `/admin`.
+
+What it does: today's searches, Google calls and estimated cost; a daily cap on Google calls (visitors see sample
+restaurants once it's hit); a pause switch; a 14-day history with Book/Order/Maps click counts; the Book and Order
+link templates (paste affiliate links there, using `{name}`, `{query}` or `{address}`); and the blocklist. While logged
+in, every restaurant popup on the main site has a "Block this place" button.
+
+Optional: `NEXT_PUBLIC_CONTACT_EMAIL` adds a contact line to `/privacy`.

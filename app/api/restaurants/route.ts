@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { CUISINES } from "@/lib/cuisines";
 import { demoRestaurants } from "@/lib/demo";
 import { foodStyle } from "@/lib/style";
+import { callsToday, fillTemplate, getBlocked, getSettings, recordSearch } from "@/lib/store";
 import type { Restaurant, SearchResponse } from "@/lib/types";
 
 const PRICE_ENUM = [
@@ -126,20 +127,32 @@ export async function GET(req: NextRequest) {
     return yes.length >= Math.ceil(count / cuisines.length) ? yes : list.filter((r) => r.kidFriendly !== false);
   };
 
-  // ---- Demo mode: no key configured ----
-  if (!key) {
+  const settings = await getSettings();
+  // Book / Order links are filled in on the server so the affiliate templates live in one place (the admin panel).
+  const withLinks = (list: Restaurant[]) =>
+    list.map((r) => ({ ...r, bookUrl: fillTemplate(settings.bookTemplate, r), orderUrl: fillTemplate(settings.orderTemplate, r) }));
+  const respond = (body: SearchResponse) =>
+    NextResponse.json({ ...body, restaurants: withLinks(body.restaurants), pool: withLinks(body.pool) });
+
+  // ---- Demo restaurants: no key, kill switch on, or today's Google budget used up ----
+  const demo = (message: string): SearchResponse => {
     const all = demoRestaurants().filter(
       (r) => (prices.length === 0 || prices.includes(r.price!)) && (!kids || r.kidFriendly) && (!openNow || r.openNow)
     );
     const groups = cuisines[0] === "any" ? [all] : cuisines.map((c) => all.filter((r) => r.cuisine === c));
     const wheel = shuffle(roundRobin(groups, count));
-    const body: SearchResponse = {
-      source: "demo",
-      restaurants: wheel,
-      pool: makePool(wheel, groups),
-      message: "Demo mode: these are made-up restaurants. Add a Google Places API key for real ones.",
-    };
-    return NextResponse.json(body);
+    return { source: "demo", restaurants: wheel, pool: makePool(wheel, groups), message };
+  };
+  const noKeyMsg = "Demo mode: these are made-up restaurants. Add a Google Places API key for real ones.";
+  const restMsg = "We're taking a quick breather from live listings. These are sample spots; try again later!";
+  if (!key) return respond(demo(noKeyMsg));
+  if (settings.paused) {
+    await recordSearch({ calls: 0, cravings: cuisines, served: "paused" });
+    return respond(demo(restMsg));
+  }
+  if (settings.dailyCap > 0 && (await callsToday()) + cuisines.length > settings.dailyCap) {
+    await recordSearch({ calls: 0, cravings: cuisines, served: "capped" });
+    return respond(demo(restMsg));
   }
 
   // ---- Google Places API (New) Text Search: one search per craving ----
@@ -156,7 +169,7 @@ export async function GET(req: NextRequest) {
     if (prices.length) reqBody.priceLevels = prices.map((n) => PRICE_ENUM[n]);
     if (openNow) reqBody.openNow = true;
 
-    const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
+    const res = await fetch(process.env.PLACES_API_URL || "https://places.googleapis.com/v1/places:searchText", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -182,14 +195,15 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const results = await Promise.all(cuisines.map(placesFor));
-    // The same place can show up under two cravings; keep it in the first group only.
-    const seen = new Set<string>();
+    const [results, blocked] = await Promise.all([Promise.all(cuisines.map(placesFor)), getBlocked()]);
+    await recordSearch({ calls: cuisines.length, cravings: cuisines, served: "google" });
+    // Blocked places (admin panel) are dropped. The same place can show up under two cravings; keep it once.
+    const seen = new Set<string>(Object.keys(blocked));
     const groups = results.map((list) => kidFilter(list.filter((r) => !seen.has(r.id) && seen.add(r.id))));
     const picked = shuffle(roundRobin(groups, count));
     const body: SearchResponse = { source: "google", restaurants: picked, pool: makePool(picked, groups) };
     if (!picked.length) body.message = "No restaurants matched. Try loosening the filters.";
-    return NextResponse.json(body);
+    return respond(body);
   } catch (e) {
     console.error(e);
     return NextResponse.json({ error: "Couldn't reach Google Places. Check the API key." }, { status: 502 });

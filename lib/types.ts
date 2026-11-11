@@ -14,6 +14,8 @@ export type Restaurant = {
   category?: string;
   style?: string; // short style of food, e.g. "Mexican"
   styleEmoji?: string;
+  bookUrl?: string; // "Book a table" link (affiliate template from the admin panel)
+  orderUrl?: string; // "Order delivery" link
 };
 
 export type SearchResponse = {
