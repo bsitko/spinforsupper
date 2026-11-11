@@ -249,3 +249,16 @@ button:disabled { opacity: .6; cursor: default; }
 .about .go.tip { margin-top: 8px; max-width: 360px; }
 .about .muted-note { margin-top: 32px; }
 .legal a.go { color: #fff; }
+
+/* Popup: pinned bar with the name + close while scrolling */
+.popup-bar { position: sticky; top: -34px; height: 0; margin: -34px -22px 0; z-index: 3; }
+.popup-bar + .photo { margin-top: 0; }
+.popup-bar + .kicker { margin-top: 34px; }
+.popup-bar .bar-inner { position: absolute; inset: 0 0 auto 0; height: 58px; display: flex; align-items: center; padding: 0 64px 0 20px; background: var(--card); font-weight: 900; font-size: 1.2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0; transition: opacity .15s; box-shadow: 0 4px 14px rgba(0,0,0,.12); pointer-events: none; }
+.popup-bar.show .bar-inner { opacity: 1; }
+.popup-bar .close { position: absolute; top: 7px; right: 8px; }
+.result:has(.photo) .popup-bar .close, .popup-bar.show .close { background: rgba(255,255,255,.9); color: #1d1d2c; }
+.reviews .clamp { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.reviews .more { background: none; border: none; padding: 4px 0 0; color: var(--accent); font-weight: 800; font-size: .95rem; }
+.actions .duo:empty { display: none; }
+.actions .duo { grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); }

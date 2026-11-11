@@ -127,6 +127,45 @@ function toRestaurant(pl: any, cuisine: string): Restaurant {
   };
 }
 
+// How each craving reads inside a combined search, and which Google place types count as that craving.
+const SEARCH_WORD: Record<string, string> = { japanese: "sushi", breakfast: "breakfast", mediterranean: "mediterranean", bbq: "bbq" };
+const CRAVING_TYPES: Record<string, string[]> = {
+  american: ["american_restaurant", "hamburger_restaurant", "steak_house", "diner", "chicken_restaurant", "sandwich_shop"],
+  pizza: ["pizza_restaurant"],
+  mexican: ["mexican_restaurant"],
+  italian: ["italian_restaurant"],
+  chinese: ["chinese_restaurant"],
+  japanese: ["japanese_restaurant", "sushi_restaurant", "ramen_restaurant"],
+  thai: ["thai_restaurant"],
+  indian: ["indian_restaurant"],
+  mediterranean: ["mediterranean_restaurant", "greek_restaurant", "lebanese_restaurant", "turkish_restaurant", "middle_eastern_restaurant"],
+  bbq: ["barbecue_restaurant"],
+  breakfast: ["breakfast_restaurant", "brunch_restaurant", "diner"],
+  seafood: ["seafood_restaurant"],
+  vegetarian: ["vegetarian_restaurant", "vegan_restaurant"],
+};
+// Name words for places Google only types as plain "restaurant".
+const CRAVING_WORDS: Record<string, RegExp> = {
+  american: /burger|grill|diner|steak/i,
+  pizza: /pizz/i,
+  mexican: /taco|taquer|mexic|cantina|burrito/i,
+  italian: /italia|trattoria|osteria|pasta/i,
+  chinese: /china|chinese|wok|dumpling/i,
+  japanese: /sushi|ramen|japan|izakaya/i,
+  thai: /thai/i,
+  indian: /india|tandoor|masala|curry/i,
+  mediterranean: /mediterr|greek|gyro|falafel|kebab|shawarma/i,
+  bbq: /bbq|barbe|smoke/i,
+  breakfast: /breakfast|brunch|pancake|waffle/i,
+  seafood: /seafood|oyster|crab|lobster|fish/i,
+  vegetarian: /vegan|vegetarian|veggie|plant/i,
+};
+function matchesCraving(pl: any, id: string) {
+  const types: string[] = [pl.primaryType, ...(pl.types || [])].filter(Boolean);
+  if ((CRAVING_TYPES[id] || []).some((t) => types.includes(t))) return true;
+  return CRAVING_WORDS[id]?.test(`${pl.displayName?.text ?? ""} ${pl.primaryTypeDisplayName?.text ?? ""}`) ?? false;
+}
+
 const VALID = new Set<string>(CUISINES.map((c) => c.id));
 
 export async function GET(req: NextRequest) {
@@ -137,7 +176,7 @@ export async function GET(req: NextRequest) {
   let cuisines = (p.get("cuisines") || p.get("cuisine") || "any")
     .split(",")
     .filter((c) => VALID.has(c) && c !== "any")
-    .slice(0, 4); // each craving is one billed Google call
+    .slice(0, 4); // food cravings share one Google search, so more would thin out each craving's share of the 20 results
   if (!cuisines.length) cuisines = ["any"];
   const prices = (p.get("prices") || "")
     .split(",")
@@ -185,15 +224,29 @@ export async function GET(req: NextRequest) {
     await recordSearch({ calls: 0, cravings: cuisines, served: "paused" });
     return respond(demo(restMsg));
   }
-  if (settings.dailyCap > 0 && (await callsToday()) + cuisines.length > settings.dailyCap) {
+  // Food cravings share one Google search; Cocktails needs its own (different place type).
+  const batches: string[][] = [
+    cuisines.filter((c) => c !== "cocktails"),
+    cuisines.includes("cocktails") ? ["cocktails"] : [],
+  ].filter((b) => b.length);
+  if (settings.dailyCap > 0 && (await callsToday()) + batches.length > settings.dailyCap) {
     await recordSearch({ calls: 0, cravings: cuisines, served: "capped" });
     return respond(demo(restMsg));
   }
 
-  // ---- Google Places API (New) Text Search: one search per craving ----
-  async function search(cuisine: string) {
-    const c = CUISINES.find((c) => c.id === cuisine);
-    const what = !c || cuisine === "any" ? "restaurants" : "query" in c ? c.query : `${c.label} restaurants`;
+  // ---- Google Places API (New) Text Search: one search for all food cravings (+1 if Cocktails) ----
+  async function search(batch: string[]) {
+    const cuisine = batch[0];
+    const c = batch.length === 1 ? CUISINES.find((c) => c.id === cuisine) : undefined;
+    // Several cravings: "pizza or mexican or sushi restaurants in Austin".
+    const what =
+      batch.length > 1
+        ? `${batch.map((id) => SEARCH_WORD[id] ?? id).join(" or ")} restaurants`
+        : !c || cuisine === "any"
+          ? "restaurants"
+          : "query" in c
+            ? c.query
+            : `${c.label} restaurants`;
     // "pizza restaurants in Austin, TX" / "restaurants in 60614": Google resolves the place itself.
     const reqBody: Record<string, unknown> = {
       textQuery: where ? `${what} in ${where}` : what,
@@ -230,10 +283,20 @@ export async function GET(req: NextRequest) {
     return res.json() as Promise<{ places?: any[] }>;
   }
 
-  // One page (up to 20 places) per craving. Each call is billed, so no extra pages.
-  async function placesFor(cuisine: string): Promise<Restaurant[]> {
-    const { places = [] } = await search(cuisine);
-    return places.filter((pl) => !pl.businessStatus || pl.businessStatus === "OPERATIONAL").map((pl) => toRestaurant(pl, cuisine));
+  // One page (up to 20 places) per search; each call is billed, so no extra pages.
+  // Returns one group per craving in the batch (so the wheel can take turns), plus places that fit none of them.
+  async function placesFor(batch: string[]): Promise<Restaurant[][]> {
+    const { places = [] } = await search(batch);
+    const open = places.filter((pl) => !pl.businessStatus || pl.businessStatus === "OPERATIONAL");
+    if (batch.length === 1) return [open.map((pl) => toRestaurant(pl, batch[0]))];
+    const groups: Restaurant[][] = batch.map(() => []);
+    const other: Restaurant[] = [];
+    for (const pl of open) {
+      const i = batch.findIndex((id) => matchesCraving(pl, id));
+      if (i >= 0) groups[i].push(toRestaurant(pl, batch[i]));
+      else other.push(toRestaurant(pl, ""));
+    }
+    return [...groups, other];
   }
 
   const ip = (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "unknown";
@@ -244,7 +307,7 @@ export async function GET(req: NextRequest) {
   try {
     // One craving failing shouldn't sink the others; the blocklist (Redis) failing shouldn't sink anything.
     const [settled, blocked] = await Promise.all([
-      Promise.allSettled(cuisines.map(placesFor)),
+      Promise.allSettled(batches.map(placesFor)),
       getBlocked().catch((e) => (console.error("getBlocked failed", e), {} as Record<string, string>)),
     ]);
     const failures = settled.filter((r): r is PromiseRejectedResult => r.status === "rejected").map((r) => r.reason);
@@ -257,12 +320,16 @@ export async function GET(req: NextRequest) {
       }
       throw failures[0];
     }
-    const results = settled.map((r) => (r.status === "fulfilled" ? r.value : []));
-    await recordSearch({ calls: cuisines.length, cravings: cuisines, served: "google" });
+    const results = settled.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
+    await recordSearch({ calls: batches.length, cravings: cuisines, served: "google" });
     // Blocked places (admin panel) are dropped. The same place can show up under two cravings; keep it once.
     const seen = new Set<string>(Object.keys(blocked));
     const groups = results.map((list) => kidFilter(list.filter((r) => !seen.has(r.id) && seen.add(r.id))));
-    const picked = shuffle(roundRobin(groups, count));
+    // Places that matched no specific craving (cuisine "") only fill in when the cravings run short.
+    const main = groups.filter((g) => g[0]?.cuisine !== "");
+    const extra = groups.filter((g) => g[0]?.cuisine === "");
+    const first = roundRobin(main, count);
+    const picked = shuffle([...first, ...roundRobin(extra, count - first.length)]);
     const body: SearchResponse = { source: "google", restaurants: picked, pool: makePool(picked, groups) };
     if (!picked.length) body.message = "No restaurants matched. Try loosening the filters.";
     return respond(body);

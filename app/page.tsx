@@ -62,6 +62,12 @@ export default function Home() {
   const [loadedAt, setLoadedAt] = useState(0);
   const lastQuery = useRef(""); // the last search sent to Google, to avoid paying for the same one twice
   const [shown, setShown] = useState<{ r: Restaurant; won: boolean } | null>(null);
+  const [popScrolled, setPopScrolled] = useState(false);
+  const [moreReviews, setMoreReviews] = useState(false);
+  useEffect(() => {
+    setPopScrolled(false);
+    setMoreReviews(false);
+  }, [shown?.r.id]);
   const stageRef = useRef<HTMLElement>(null);
   const [theme, setThemeState] = useState<ThemeId>("diner");
   const [favorites, setFavorites] = useState<Restaurant[]>([]);
@@ -554,7 +560,14 @@ export default function Home() {
 
       {r && (
         <div className="modal" onClick={() => setShown(null)}>
-          <div className={`result ${shown.won ? "won" : ""}`} onClick={(e) => e.stopPropagation()} role="dialog" aria-label={r.name}>
+          <div
+            key={r.id}
+            className={`result ${shown.won ? "won" : ""}`}
+            onClick={(e) => e.stopPropagation()}
+            onScroll={(e) => setPopScrolled(e.currentTarget.scrollTop > 140)}
+            role="dialog"
+            aria-label={r.name}
+          >
             {shown.won && (
               <div className="confetti" aria-hidden>
                 {Array.from("🎉🍕🌮🍣🍔🥳🍜🎊").map((c, i) => (
@@ -564,9 +577,15 @@ export default function Home() {
                 ))}
               </div>
             )}
-            <button className="close" onClick={() => setShown(null)} aria-label="Close">
-              ✕
-            </button>
+            {/* Stays pinned while the popup scrolls: the name fades in once the big title scrolls away. */}
+            <div className={`popup-bar ${popScrolled ? "show" : ""}`}>
+              <div className="bar-inner" aria-hidden={!popScrolled}>
+                {r.name}
+              </div>
+              <button className="close" onClick={() => setShown(null)} aria-label="Close">
+                ✕
+              </button>
+            </div>
             {r.photo && source === "google" && <Photo key={r.id} r={r} />}
             <p className="kicker">{shown.won ? "The wheel has spoken!" : "On the wheel"}</p>
             <h3>{r.name}</h3>
@@ -586,7 +605,12 @@ export default function Home() {
             {r.reviewSummary && (
               <div className="reviews">
                 <p className="reviews-title">💬 What people say</p>
-                <p>{r.reviewSummary.text}</p>
+                <p className={moreReviews ? "" : "clamp"}>{r.reviewSummary.text}</p>
+                {!moreReviews && r.reviewSummary.text.length > 180 && (
+                  <button type="button" className="more" onClick={() => setMoreReviews(true)}>
+                    Read more
+                  </button>
+                )}
                 <p className="reviews-foot">
                   {r.reviewSummary.disclosure}
                   {r.reviewSummary.reviewsUrl && (
@@ -645,16 +669,18 @@ export default function Home() {
                   )}
                 </div>
               )}
+              <div className="duo">
               {r.website && (
                 <a className="big" href={r.website} target="_blank" rel="noreferrer" onClick={() => (track("open_website", { place: r.name }), countClick("website"))}>
-                  🌐 Website / menu
+                  🌐 Website
                 </a>
               )}
               {!shown.won && items.length > 0 && (
                 <button className="big" onClick={() => (toggleWheel(r), setShown(null))}>
-                  {onWheel(r) ? "➖ Take off the wheel" : "➕ Add to the wheel"}
+                  {onWheel(r) ? "➖ Off the wheel" : "➕ On the wheel"}
                 </button>
               )}
+              </div>
               {shown.won && (
                 <button className="big" onClick={veto}>
                   🙅 Nope, spin again
