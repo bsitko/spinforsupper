@@ -6,6 +6,8 @@ import { track } from "@/lib/analytics";
 import { CUISINES } from "@/lib/cuisines";
 import { THEMES, THEME_IDS, type Theme, type ThemeId } from "@/lib/themes";
 import type { Restaurant, SearchResponse } from "@/lib/types";
+import { pickParams } from "@/lib/share";
+import { loadFavorites, loadWheels, saveFavorites, saveWheels, type SavedWheel } from "@/lib/saved";
 
 const dollars = (n?: number) => (n ? "$".repeat(n) : "");
 
@@ -46,6 +48,90 @@ export default function Home() {
   const [shown, setShown] = useState<{ r: Restaurant; won: boolean } | null>(null);
   const stageRef = useRef<HTMLElement>(null);
   const [theme, setThemeState] = useState<ThemeId>("diner");
+  const [favorites, setFavorites] = useState<Restaurant[]>([]);
+  const [wheels, setWheels] = useState<SavedWheel[]>([]);
+  const [savedOpen, setSavedOpen] = useState(false);
+  const [toast, setToast] = useState("");
+  const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  function say(msg: string) {
+    setToast(msg);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(""), 2200);
+  }
+
+  useEffect(() => {
+    setFavorites(loadFavorites());
+    setWheels(loadWheels());
+  }, []);
+
+  const isFav = (p: Restaurant) => favorites.some((f) => f.id === p.id);
+  function toggleFav(p: Restaurant) {
+    const next = isFav(p) ? favorites.filter((f) => f.id !== p.id) : [p, ...favorites];
+    setFavorites(next);
+    saveFavorites(next);
+    track(isFav(p) ? "unfavorite" : "favorite", { place: p.name });
+    say(isFav(p) ? "Removed from favorites" : "❤️ Saved to favorites");
+  }
+
+  function saveWheel() {
+    const label = cuisines[0] === "any" ? "Anything" : cuisines.map((c) => CUISINES.find((x) => x.id === c)?.label ?? c).join(" + ");
+    const where = zip.trim() || "near me";
+    const name = prompt("Name this wheel", `${label} · ${where}`);
+    if (name === null) return;
+    const w: SavedWheel = { id: String(Date.now()), name: name.trim().slice(0, 60) || `${label} · ${where}`, items, pool, source, savedAt: Date.now() };
+    const next = [w, ...wheels];
+    setWheels(next);
+    saveWheels(next);
+    track("save_wheel");
+    say("💾 Wheel saved");
+  }
+
+  function deleteWheel(id: string) {
+    const next = wheels.filter((w) => w.id !== id);
+    setWheels(next);
+    saveWheels(next);
+  }
+
+  // Put a saved set back on the wheel. No search, so it costs nothing.
+  function openSaved(list: Restaurant[], all: Restaurant[], src: "google" | "demo") {
+    setItems(list.slice(0, 12));
+    setPool(all);
+    setSource(src);
+    setNotice("");
+    setError("");
+    setView("wheel");
+    setSavedOpen(false);
+    lastQuery.current = "";
+    setLoadedAt(Date.now());
+  }
+  function spinFavorites() {
+    const a = [...favorites];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    track("spin_favorites");
+    openSaved(a, favorites, favorites.every((f) => f.id.startsWith("demo-")) ? "demo" : "google");
+  }
+
+  // Share the winner: the phone's share sheet when there is one, otherwise copy a link.
+  async function share(p: Restaurant) {
+    const url = `${location.origin}/pick?${pickParams(p)}`;
+    const text = `🎡 The wheel picked ${p.name}!`;
+    track("share", { place: p.name });
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: text, text, url });
+      } catch {}
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(`${text} ${url}`);
+      say("🔗 Link copied! Paste it in your group chat.");
+    } catch {
+      prompt("Copy this link:", url);
+    }
+  }
 
   // Recolor the page's buttons and highlights to match the wheel theme.
   useEffect(() => {
@@ -199,7 +285,12 @@ export default function Home() {
   return (
     <main>
       <header>
-        <ThemeMenu theme={theme} onPick={setTheme} />
+        <div className="topbar">
+          <button type="button" className="theme-toggle" onClick={() => setSavedOpen(true)}>
+            ❤️ Saved{favorites.length + wheels.length ? ` (${favorites.length + wheels.length})` : ""}
+          </button>
+          <ThemeMenu theme={theme} onPick={setTheme} />
+        </div>
         <Logo className="logo" />
         <h1>
           Spin for
@@ -326,11 +417,16 @@ export default function Home() {
             </p>
           )}
 
-          {view === "wheel" && pool.length > 2 && (
-            <button type="button" className="big regen" onClick={reshuffle}>
-              🔄 New wheel
+          <div className="duo regen">
+            {view === "wheel" && pool.length > 2 && (
+              <button type="button" className="big" onClick={reshuffle}>
+                🔄 New wheel
+              </button>
+            )}
+            <button type="button" className="big" onClick={saveWheel}>
+              💾 Save this wheel
             </button>
-          )}
+          </div>
         </section>
       )}
 
@@ -378,6 +474,14 @@ export default function Home() {
               <a className="go" href={r.mapsUrl} target="_blank" rel="noreferrer" onClick={() => (track(shown.won ? "lets_go" : "open_listing", { place: r.name }), countClick("maps"))}>
                 {shown.won ? "🗺️ Let’s go!" : "🗺️ See on Google"}
               </a>
+              <div className="duo">
+                <button className="big" onClick={() => share(r)}>
+                  📤 Share
+                </button>
+                <button className={`big ${isFav(r) ? "on" : ""}`} onClick={() => toggleFav(r)} aria-pressed={isFav(r)}>
+                  {isFav(r) ? "❤️ Saved" : "🤍 Save"}
+                </button>
+              </div>
               {(r.bookUrl || r.orderUrl) && (
                 <div className="duo">
                   {r.bookUrl && (
@@ -409,6 +513,74 @@ export default function Home() {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {savedOpen && (
+        <div className="modal" onClick={() => setSavedOpen(false)}>
+          <div className="result saved" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Saved">
+            <button className="close" onClick={() => setSavedOpen(false)} aria-label="Close">
+              ✕
+            </button>
+            <h3>Saved</h3>
+            <p className="hint">Kept on this device only.</p>
+
+            <h4 className="list-title">❤️ Favorite places</h4>
+            {favorites.length >= 2 && (
+              <button className="go small" onClick={spinFavorites}>
+                🎡 Spin my favorites
+              </button>
+            )}
+            {favorites.length ? (
+              <ul className="picks">
+                {favorites.map((p) => (
+                  <li key={p.id}>
+                    <button type="button" className="pick" onClick={() => (setSavedOpen(false), setShown({ r: p, won: false }))}>
+                      <span className="pick-body">
+                        <span className="pick-name">{p.name}</span>
+                        <span className="pick-meta">
+                          {[p.rating ? `⭐ ${p.rating.toFixed(1)}` : null, dollars(p.price) || null, p.style ? `${p.styleEmoji ?? ""} ${p.style}`.trim() : null].filter(Boolean).join(" · ")}
+                        </span>
+                      </span>
+                      <span className="chev" aria-hidden>›</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="empty">Tap 🤍 Save on any place to keep it here.</p>
+            )}
+
+            <h4 className="list-title">🎡 Saved wheels</h4>
+            {wheels.length ? (
+              <ul className="picks">
+                {wheels.map((w) => (
+                  <li key={w.id} className="saved-row">
+                    <button type="button" className="pick" onClick={() => (track("open_saved_wheel"), openSaved(w.items, w.pool, w.source))}>
+                      <span className="pick-body">
+                        <span className="pick-name">{w.name}</span>
+                        <span className="pick-meta">
+                          {w.items.length} places · {new Date(w.savedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                        </span>
+                      </span>
+                      <span className="chev" aria-hidden>›</span>
+                    </button>
+                    <button type="button" className="del" aria-label={`Delete ${w.name}`} onClick={() => confirm(`Delete "${w.name}"?`) && deleteWheel(w.id)}>
+                      🗑️
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="empty">After you find food, tap 💾 Save this wheel to keep it.</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className="toast" role="status">
+          {toast}
         </div>
       )}
 
