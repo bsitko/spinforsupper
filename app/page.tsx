@@ -297,7 +297,7 @@ export default function Home() {
         </h1>
         <p className="tag">
           Hungry? Let’s find you a place to eat.
-          <small>Tell us what you’re in the mood for. We’ll do the rest.</small>
+          <small>Browse the best spots near you, or spin the wheel and let fate decide.</small>
         </p>
       </header>
 
