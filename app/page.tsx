@@ -402,6 +402,7 @@ export default function Home() {
                             .filter(Boolean)
                             .join(" · ")}
                         </span>
+                        {(p.description || p.reviewSummary) && <span className="pick-desc">{p.description || p.reviewSummary!.text}</span>}
                         {p.address && <span className="pick-addr">{p.address}</span>}
                       </span>
                       <span className="chev" aria-hidden>›</span>
