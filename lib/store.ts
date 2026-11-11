@@ -15,7 +15,7 @@ export type Settings = {
 export const DEFAULT_SETTINGS: Settings = {
   dailyCap: 300,
   paused: false,
-  costPerCall: 0.035,
+  costPerCall: 0.04, // Text Search with Atmosphere fields, list price per call
   costPerPhoto: 0.007,
   bookTemplate: "https://www.opentable.com/s?term={query}",
   orderTemplate: "https://www.doordash.com/search/store/{name}/",

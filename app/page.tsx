@@ -461,6 +461,8 @@ export default function Home() {
               {r.kidFriendly ? <span>👶 Kid-friendly</span> : null}
               {r.openNow === true ? <span className="open">Open now</span> : r.openNow === false ? <span className="closed">Closed</span> : null}
             </p>
+            {r.description && <p className="blurb">{r.description}</p>}
+            <Badges r={r} />
             <p className="addr">{r.address}</p>
             {source === "google" && (
               <p className="attribution">
@@ -666,5 +668,26 @@ function Photo({ r }: { r: Restaurant }) {
         </figcaption>
       )}
     </figure>
+  );
+}
+
+// Reservation / dine-in / takeout / delivery / patio, only for things Google says yes to.
+const BADGES = [
+  ["reservable", "📅 Takes reservations"],
+  ["dineIn", "🍽️ Dine-in"],
+  ["takeout", "🥡 Takeout"],
+  ["delivery", "🛵 Delivery"],
+  ["outdoorSeating", "☀️ Outdoor seating"],
+] as const;
+
+function Badges({ r }: { r: Restaurant }) {
+  const on = BADGES.filter(([k]) => r.serves?.[k] === true);
+  if (!on.length) return null;
+  return (
+    <ul className="badges">
+      {on.map(([k, label]) => (
+        <li key={k}>{label}</li>
+      ))}
+    </ul>
   );
 }

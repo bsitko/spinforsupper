@@ -55,5 +55,7 @@ export function demoRestaurants(): Restaurant[] {
     ...(({ style, emoji }) => ({ style, styleEmoji: emoji }))(foodStyle(undefined, [], cuisine)),
     category: cuisine === "cocktails" ? "Cocktail bar" : cuisine[0].toUpperCase() + cuisine.slice(1) + " restaurant",
     mapsUrl: `https://www.google.com/maps/search/${encodeURIComponent(name)}`,
+    description: `Made-up ${cuisine === "any" ? "" : cuisine + " "}spot for trying out the app.`,
+    serves: { reservable: price >= 3, dineIn: true, takeout: cuisine !== "cocktails", delivery: i % 2 === 0, outdoorSeating: i % 3 === 0 },
   }));
 }

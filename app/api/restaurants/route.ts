@@ -30,8 +30,18 @@ const FIELD_MASK = [
   "places.types",
   "places.photos", // just the photo reference: no extra charge until a photo is actually loaded
 ].join(",");
-// Kid-friendliness is an "Atmosphere" field, which Google bills at a higher rate, so only ask for it when needed.
-const KID_FIELDS = "places.goodForChildren,places.menuForChildren";
+// "Atmosphere" fields put each search in Google's higher price tier (Bill chose this, 2026-11-11):
+// once one is asked for, the rest come at no extra cost, so we ask for all the useful ones.
+const ATMOSPHERE_FIELDS = [
+  "places.goodForChildren",
+  "places.menuForChildren",
+  "places.editorialSummary",
+  "places.reservable",
+  "places.dineIn",
+  "places.takeout",
+  "places.delivery",
+  "places.outdoorSeating",
+].join(",");
 
 // Basic abuse guard: each IP gets a limited number of Google searches per window (per server instance).
 const RATE_WINDOW_MS = 10 * 60 * 1000;
@@ -90,6 +100,14 @@ function toRestaurant(pl: any, cuisine: string): Restaurant {
     category: pl.primaryTypeDisplayName?.text,
     ...(({ style, emoji }) => ({ style, styleEmoji: emoji }))(foodStyle(pl.primaryType, pl.types, cuisine, pl.primaryTypeDisplayName?.text)),
     cuisine,
+    description: pl.editorialSummary?.text,
+    serves: {
+      reservable: pl.reservable,
+      dineIn: pl.dineIn,
+      takeout: pl.takeout,
+      delivery: pl.delivery,
+      outdoorSeating: pl.outdoorSeating,
+    },
     photo: pl.photos?.[0]?.name,
     photoBy: pl.photos?.[0]?.authorAttributions?.[0]
       ? { name: pl.photos[0].authorAttributions[0].displayName, url: pl.photos[0].authorAttributions[0].uri }
@@ -179,7 +197,7 @@ export async function GET(req: NextRequest) {
       headers: {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": key!,
-        "X-Goog-FieldMask": kids ? `${FIELD_MASK},${KID_FIELDS}` : FIELD_MASK,
+        "X-Goog-FieldMask": `${FIELD_MASK},${ATMOSPHERE_FIELDS}`,
       },
       body: JSON.stringify(reqBody),
       cache: "no-store",

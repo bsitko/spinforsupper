@@ -215,3 +215,7 @@ button:disabled { opacity: .6; cursor: default; }
 .photo figcaption { position: absolute; right: 8px; bottom: 6px; font-size: .75rem; font-weight: 600; color: #fff; background: rgba(0,0,0,.45); padding: 2px 8px; border-radius: 999px; }
 .photo figcaption a { color: inherit; text-decoration: underline; }
 .result:has(.photo) .close { background: rgba(255,255,255,.9); color: #1d1d2c; z-index: 2; }
+
+.blurb { font-size: 1.1rem; font-weight: 600; line-height: 1.35; margin: 4px 0 12px; text-wrap: balance; }
+.badges { list-style: none; padding: 0; margin: 0 0 12px; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.badges li { font-size: .9rem; font-weight: 700; padding: 5px 10px; border-radius: 999px; border: 2px solid var(--line); }
