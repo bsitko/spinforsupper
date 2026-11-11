@@ -293,11 +293,12 @@ export default function Home() {
         </div>
         <Logo className="logo" />
         <h1>
-          Spin for
-          <br />
-          <span>Supper!</span>
+          Spin for <span>Supper</span>
         </h1>
-        <p className="tag">Can’t decide where to eat? Let the wheel pick.</p>
+        <p className="tag">
+          Hungry? Let’s find you a place to eat.
+          <small>Tell us what you’re in the mood for. We’ll do the rest.</small>
+        </p>
       </header>
 
       <section className="step">
