@@ -28,6 +28,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [source, setSource] = useState<"google" | "demo">("demo");
   const [items, setItems] = useState<Restaurant[]>([]); // on the wheel
   const [pool, setPool] = useState<Restaurant[]>([]); // everything that matched, for the list
   const [view, setView] = useState<"wheel" | "list">("wheel");
@@ -124,6 +125,7 @@ export default function Home() {
       const data = (await res.json()) as SearchResponse & { error?: string };
       if (!res.ok) throw new Error(data.error || "Something went wrong.");
       setNotice(data.message || "");
+      setSource(data.source);
       if (data.restaurants.length < 2) {
         setItems([]);
         setPool([]);
@@ -289,6 +291,12 @@ export default function Home() {
             </>
           )}
 
+          {source === "google" && (
+            <p className="attribution">
+              Places data from <span translate="no">Google Maps</span>
+            </p>
+          )}
+
           {view === "wheel" && pool.length > 2 && (
             <button type="button" className="big regen" onClick={reshuffle}>
               🔄 New wheel
@@ -345,6 +353,11 @@ export default function Home() {
               {r.openNow === true ? <span className="open">Open now</span> : r.openNow === false ? <span className="closed">Closed</span> : null}
             </p>
             <p className="addr">{r.address}</p>
+            {source === "google" && (
+              <p className="attribution">
+                <span translate="no">Google Maps</span>
+              </p>
+            )}
             {r.phone && (
               <p className="addr">
                 <a href={`tel:${r.phone}`}>{r.phone}</a>
